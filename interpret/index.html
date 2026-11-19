@@ -200,7 +200,9 @@ function rankModels(list) {
 // the strongest stable full (non-lite) flash models, best first — tried before the lite ones when "정확하게" is chosen
 const strongModels = (list) => list.filter(n => !/(lite|preview|exp|omni)/.test(n))
   .sort((a, b) => parseFloat((b.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || "0") - parseFloat((a.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || "0"));
-const restUntil = {};   // model → time it may be tried again after it was busy or slow (free models are often overloaded)
+// model → time it may be tried again after it was busy or slow (free models are often overloaded); kept across page loads,
+// because opening the app again used to wait on the same busy models first (25 s for the first sentence in the 11/19 test)
+const restUntil = lsGet("interp.rest", {});
 function defaultModel(list) { return rankModels(list)[0] || "gemini-flash-lite-latest"; }
 function parseJSON(text) {
   const t = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
@@ -231,23 +233,23 @@ async function callModel(model, system, parts, wait = 20000) {
   } finally { clearTimeout(timer); }
 }
 // Order of models for one request:
-//   a model picked in 설정 → (정확하게) the 2 strongest full models, each given only 8 s → the lite models, 20 s each.
-// A model that was busy or slow rests for 10 minutes, so a busy period costs the wait once, not on every sentence.
+//   a model picked in 설정 → (정확하게) the strongest full model that is not resting, given only 6 s → the lite models, 20 s each.
+// A model that was busy or slow rests for 30 minutes, so a busy period costs at most 6 s once, not on every sentence.
 let lastModel = "";
 async function gemini(system, parts) {
   const now = Date.now(), resting = (m) => restUntil[m] > now;
-  const strong = settings.prefer === "quality" ? strongModels(models).slice(0, 2).filter(m => !resting(m)) : [];
+  const strong = settings.prefer === "quality" ? strongModels(models).filter(m => !resting(m)).slice(0, 1) : [];
   const light = rankModels(models).filter(m => /lite/.test(m));
   let order = [...new Set([settings.model, ...strong, ...light, ...rankModels(models)].filter(Boolean))].slice(0, 6);
   if (!order.length) order = ["gemini-flash-lite-latest"];
   let last = null, j = null;
   for (const m of order) {
-    try { j = await callModel(m, system, parts, strong.includes(m) && m !== settings.model ? 8000 : 20000); lastModel = m; break; }
+    try { j = await callModel(m, system, parts, strong.includes(m) && m !== settings.model ? 6000 : 20000); lastModel = m; break; }
     catch (e) {
       last = e;
       if (e.code === "key" || e.code === "net") throw e;   // another model would not help
       if (e.code === "model") { models = models.filter(x => x !== m); lsSet("thai.gemini.models", models); }
-      if (e.code === "busy" || e.code === "slow" || e.code === "quota") restUntil[m] = Date.now() + 10 * 60000;
+      if (e.code === "busy" || e.code === "slow" || e.code === "quota") { restUntil[m] = Date.now() + 30 * 60000; lsSet("interp.rest", restUntil); }
     }
   }
   if (!j) {
