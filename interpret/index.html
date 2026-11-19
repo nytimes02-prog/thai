@@ -209,6 +209,9 @@ function parseJSON(text) {
   if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch {} }
   throw { code: "json", msg: "통역 결과를 읽지 못했어요. 다시 말해 주세요." };
 }
+const ANSWER_SCHEMA = { type: "OBJECT", properties: { lang: { type: "STRING", enum: ["ko", "th", "none"] }, heard: { type: "STRING" }, translation: { type: "STRING" },
+  th_roman: { type: "STRING" }, th_hangul: { type: "STRING" }, note: { type: "STRING" } },
+  required: ["lang", "heard", "translation", "th_roman", "th_hangul", "note"], propertyOrdering: ["lang", "heard", "translation", "th_roman", "th_hangul", "note"] };
 // One request to one model, given up after `wait` ms (an overloaded model can hang far longer than that).
 async function callModel(model, system, parts, wait = 20000) {
   const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), wait);
@@ -216,7 +219,8 @@ async function callModel(model, system, parts, wait = 20000) {
     const r = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST", signal: ctl.signal, headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       // no thinkingConfig: some models answer 400 "invalid argument" to it, and the lite models are quick without it
-      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts }], generationConfig: { responseMimeType: "application/json", temperature: 0.2 } }),
+      // responseSchema: without it the lite model sometimes wrote Thai as broken "\u0e.." escapes inside its JSON (garbled translations)
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts }], generationConfig: { responseMimeType: "application/json", responseSchema: ANSWER_SCHEMA, temperature: 0.2 } }),
     });
     if (!r.ok) throw await apiError(r);
     return await r.json();
@@ -440,6 +444,12 @@ async function translateText(text) {
   const hint = isThai(text) ? "th" : "ko";
   await runTranslate([{ text: contextText() + `Typed text (${hint === "ko" ? "Korean" : "Thai"}):\n${text}` }], hint, text);
 }
+// the Hangul reading sometimes carries a stray Thai letter or two: drop those; if it is mostly not Hangul, drop the reading
+function cleanHangul(s) {
+  const t = String(s || "").replace(/[฀-๿ᄀ-ᇿ]+/g, "").replace(/\s{2,}/g, " ").trim();
+  const hangul = (t.match(/[가-힣]/g) || []).length, latin = (t.match(/[a-z]/gi) || []).length;
+  return hangul && latin < hangul / 4 ? t : "";
+}
 async function runTranslate(parts, hint, typed) {
   if (!apiKey) { showSetup(true); toast("먼저 무료 AI 키를 넣어 주세요"); return; }
   busy = true; setStatus("<b>통역하는 중…</b>");
@@ -450,7 +460,7 @@ async function runTranslate(parts, hint, typed) {
     pending.remove();
     const lang = r.lang === "th" || r.lang === "ko" ? r.lang : (typed ? hint : "none");
     if (lang === "none" || !String(r.translation || "").trim()) { setStatus("말소리를 알아듣지 못했어요. 다시 말해 주세요."); return; }
-    const item = { id: Date.now(), lang, heard: String(r.heard || typed || ""), translation: String(r.translation), th_roman: String(r.th_roman || ""), th_hangul: /[฀-๿a-z]/i.test(r.th_hangul || "") ? "" : String(r.th_hangul || ""), note: String(r.note || "") };   // a "Hangul" reading that slipped into Thai or Latin letters is dropped
+    const item = { id: Date.now(), lang, heard: String(r.heard || typed || ""), translation: String(r.translation), th_roman: String(r.th_roman || ""), th_hangul: cleanHangul(r.th_hangul), note: String(r.note || "") };
     log.push(item); saveLog(); $("list").append(card(item)); scrollDown();
     busy = false;
     await speak(item.translation, lang === "ko" ? "th" : "ko");
