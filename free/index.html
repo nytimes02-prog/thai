@@ -359,6 +359,7 @@ const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform 
 const settings = Object.assign({ gender: "m", level: "beginner", pron: "both", rate: 0.85, tones: true, micLang: "th", dir: "ko2th",
   keepAwake: false, model: "", readKo: true, readFix: true, handsFree: true }, lsGet("thai.settings", {}));
 const saveSettings = () => lsSet("thai.settings", settings);
+if (settings.modelPick !== 2) { settings.model = ""; settings.modelPick = 2; saveSettings(); }   // 11/19: drop the old default (gemini-flash-latest hung); the fast lite model is chosen instead
 let apiKey = lsGet("thai.gemini.key", "");
 let models = lsGet("thai.gemini.models", []);
 let conv = lsGet("thai.conv", null);
@@ -619,12 +620,14 @@ async function listModels(key) {
     .map(m => String(m.name).replace(/^models\//, ""))
     .filter(n => /^gemini/.test(n) && /flash/.test(n) && !/(image|tts|audio|live|embed|robotics|computer|thinking-exp)/.test(n));
 }
-function defaultModel(list) {
-  if (list.includes("gemini-flash-latest")) return "gemini-flash-latest";
+// 11/19 test with the user's free key: gemini-flash-latest hung for 30 s+, the newest full flash answered "high demand" (503),
+// gemini-3.5-flash-lite answered in about 1 s. So the newest stable "lite" model comes first and the others are fallbacks.
+function rankModels(list) {
   const ver = (n) => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || "0");
-  const score = (n) => ver(n) * 100 - (/lite/.test(n) ? 30 : 0) - (/(preview|exp)/.test(n) ? 20 : 0) - (/-\d{3}$/.test(n) ? 1 : 0);
-  return [...list].sort((a, b) => score(b) - score(a))[0] || "gemini-flash-latest";
+  const score = (n) => (/lite/.test(n) ? 1000 : 0) + ver(n) * 100 + (/latest/.test(n) ? 40 : 0) - (/(preview|exp)/.test(n) ? 300 : 0) - (/omni/.test(n) ? 500 : 0);
+  return [...list].sort((a, b) => score(b) - score(a));
 }
+function defaultModel(list) { return rankModels(list)[0] || "gemini-flash-lite-latest"; }
 function parseJSON(text) {
   const t = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
   try { return JSON.parse(t); } catch {}
@@ -632,7 +635,7 @@ function parseJSON(text) {
   if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch {} }
   throw { code: "json", msg: "대답을 읽지 못했어요. 다시 보내 주세요." };
 }
-async function gemini(system, turns, signal, retried) {
+async function gemini(system, turns, signal, tries = 0) {
   const contents = [];
   for (const t of turns) {
     const role = t.role === "assistant" ? "model" : "user";
@@ -641,23 +644,33 @@ async function gemini(system, turns, signal, retried) {
     else contents.push({ role, parts: [{ text: t.content }] });
   }
   const model = settings.model || defaultModel(models);
+  // a model that is busy, too slow (25 s), retired or over its free quota hands over to the next best one (up to 4 tries)
+  const nextModel = (err) => {
+    if (tries >= 3) throw err;
+    if (err.code === "model") { models = models.filter(x => x !== model); lsSet("thai.gemini.models", models); }
+    const order = rankModels(models), i = order.indexOf(model);
+    settings.model = order[(i + 1) % order.length] || defaultModel(models); saveSettings();
+    if (settings.model === model) throw err;
+    return gemini(system, turns, signal, tries + 1);
+  };
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 25000);
+  const stop = () => ctl.abort(); signal?.addEventListener("abort", stop);
   let r;
   try {
     r = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
-      method: "POST", signal,
+      method: "POST", signal: ctl.signal,
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents,
         generationConfig: { responseMimeType: "application/json", temperature: 0.8 } }),
     });
   } catch (e) {
-    if (e?.name === "AbortError") throw { code: "cancelled" };
+    if (signal?.aborted) throw { code: "cancelled" };
+    if (e?.name === "AbortError") return nextModel({ code: "busy", msg: "AI 서버가 너무 느려요. 잠시 뒤 다시 보내 주세요." });
     throw { code: "net", msg: "인터넷 연결을 확인하고 다시 보내 주세요." };
-  }
+  } finally { clearTimeout(timer); signal?.removeEventListener("abort", stop); }
   if (!r.ok) {
     const err = await apiError(r);
-    if (err.code === "model" && !retried) {
-      try { models = await listModels(apiKey); lsSet("thai.gemini.models", models); settings.model = defaultModel(models); saveSettings(); return gemini(system, turns, signal, true); } catch {}
-    }
+    if (err.code === "model" || err.code === "busy" || err.code === "quota") return nextModel(err);
     throw err;
   }
   const j = await r.json();

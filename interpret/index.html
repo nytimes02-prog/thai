@@ -154,6 +154,7 @@ let apiKey = lsGet("thai.gemini.key", "");
 let models = lsGet("thai.gemini.models", []);
 const settings = Object.assign({ model: "", gender: "m", sens: "mid", silence: 900, rate: 0.9, mode: "auto", showReading: true }, lsGet("interp.settings", {}));
 const saveSettings = () => lsSet("interp.settings", settings);
+if (settings.modelPick !== 2) { settings.model = ""; settings.modelPick = 2; saveSettings(); }   // 11/19: drop the old default (gemini-flash-latest hung); the fast lite model is chosen below
 let log = lsGet("interp.log", []);
 const saveLog = () => { log = log.slice(-80); lsSet("interp.log", log); };
 
@@ -179,12 +180,14 @@ async function listModels(key) {
     .map(m => String(m.name).replace(/^models\//, ""))
     .filter(n => /^gemini/.test(n) && /flash/.test(n) && !/(image|tts|audio|live|embed|robotics|computer|thinking-exp)/.test(n));
 }
-function defaultModel(list) {
-  if (list.includes("gemini-flash-latest")) return "gemini-flash-latest";
+// 11/19 test with the user's free key: gemini-flash-latest hung for 30 s+ and the newest full flash answered "high demand" (503),
+// while gemini-3.5-flash-lite answered in about 1 s. For live interpreting a fast "lite" model comes first; the rest are fallbacks.
+function rankModels(list) {
   const ver = (n) => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || "0");
-  const score = (n) => ver(n) * 100 - (/lite/.test(n) ? 30 : 0) - (/(preview|exp)/.test(n) ? 20 : 0);
-  return [...list].sort((a, b) => score(b) - score(a))[0] || "gemini-flash-latest";
+  const score = (n) => (/lite/.test(n) ? 1000 : 0) + ver(n) * 100 + (/latest/.test(n) ? 40 : 0) - (/(preview|exp)/.test(n) ? 300 : 0) - (/omni/.test(n) ? 500 : 0);
+  return [...list].sort((a, b) => score(b) - score(a));
 }
+function defaultModel(list) { return rankModels(list)[0] || "gemini-flash-lite-latest"; }
 function parseJSON(text) {
   const t = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
   try { return JSON.parse(t); } catch {}
@@ -192,28 +195,41 @@ function parseJSON(text) {
   if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch {} }
   throw { code: "json", msg: "통역 결과를 읽지 못했어요. 다시 말해 주세요." };
 }
-let noThinkCfg = lsGet("interp.noThinkCfg", false);   // some models reject thinkingConfig; remember and stop sending it
-async function gemini(system, parts, retried) {
-  const model = settings.model || defaultModel(models);
-  const gen = { responseMimeType: "application/json", temperature: 0.2 };
-  if (!noThinkCfg) gen.thinkingConfig = { thinkingBudget: 0 };   // translation is quicker without "thinking"
-  let r;
+// One request to one model, given up after 20 s (an overloaded model can hang far longer than that).
+async function callModel(model, system, parts) {
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 20000);
   try {
-    r = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
-      method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts }], generationConfig: gen }),
+    const r = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST", signal: ctl.signal, headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      // no thinkingConfig: some models answer 400 "invalid argument" to it, and the lite models are quick without it
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts }], generationConfig: { responseMimeType: "application/json", temperature: 0.2 } }),
     });
-  } catch { throw { code: "net", msg: "인터넷 연결을 확인해 주세요." }; }
-  if (!r.ok) {
-    const err = await apiError(r);
-    if (err.code === "bad" && !noThinkCfg && /thinking/i.test(err.msg)) { noThinkCfg = true; lsSet("interp.noThinkCfg", true); return gemini(system, parts, retried); }
-    if (err.code === "bad") err.msg = "통역 요청이 거절됐어요. 다시 말해 주세요.";
-    if (err.code === "model" && !retried) {
-      try { models = await listModels(apiKey); lsSet("thai.gemini.models", models); settings.model = defaultModel(models); saveSettings(); return gemini(system, parts, true); } catch {}
+    if (!r.ok) throw await apiError(r);
+    return await r.json();
+  } catch (e) {
+    if (e?.name === "AbortError") throw { code: "slow", msg: "AI 서버가 너무 느려요. 잠시 뒤 다시 말해 주세요." };
+    if (e?.code) throw e;
+    throw { code: "net", msg: "인터넷 연결을 확인해 주세요." };
+  } finally { clearTimeout(timer); }
+}
+// Tries the chosen model first, then the next best ones: a busy, slow, retired or over-quota model moves on to another
+// (each model has its own free quota). The model that answered becomes the one used next time.
+async function gemini(system, parts) {
+  const order = [...new Set([settings.model, ...rankModels(models)].filter(Boolean))].slice(0, 5);
+  if (!order.length) order.push("gemini-flash-lite-latest");
+  let last = null, j = null;
+  for (const m of order) {
+    try { j = await callModel(m, system, parts); if (settings.model !== m) { settings.model = m; saveSettings(); } break; }
+    catch (e) {
+      last = e;
+      if (e.code === "key" || e.code === "net") throw e;   // another model would not help
+      if (e.code === "model") { models = models.filter(x => x !== m); lsSet("thai.gemini.models", models); }
     }
-    throw err;
   }
-  const j = await r.json();
+  if (!j) {
+    if (last?.code === "bad") last.msg = "통역 요청이 거절됐어요. 다시 말해 주세요.";
+    throw last || { code: "error", msg: "통역 결과를 받지 못했어요. 다시 말해 주세요." };
+  }
   const text = (j.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || "").join("");
   if (!text) throw { code: "blocked", msg: "이 말은 통역 결과를 받지 못했어요." };
   return parseJSON(text);
