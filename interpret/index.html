@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B7259">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>ล่าม 한·태 자동 통역</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@600;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<style>
+/* Layout: phone-first column — header, scrolling conversation, control dock pinned at the bottom. */
+:root {
+  --bg: #EFF4F1; --surface: #FFFFFF; --surface-2: #E3ECE7; --ink: #14211D; --muted: #5A6B65; --line: #D2DED8;
+  --jade: #0B7259; --jade-ink: #FFFFFF; --jade-soft: #D8EEE6;
+  --pink: #C93370; --pink-soft: #FBE3EC; --pink-ink: #5C1231;
+  --warn-bg: #FFF2CF; --warn-ink: #6E4B00; --bad: #B3261E;
+  --f-display: "Bai Jamjuree", "IBM Plex Sans Thai", system-ui, sans-serif;
+  --f-thai: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif;
+  --f-ko: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0D1513; --surface: #16201D; --surface-2: #1E2B27; --ink: #E4EDEA; --muted: #92A59F; --line: #2A3934;
+  --jade: #3DC49E; --jade-ink: #052019; --jade-soft: #173A30;
+  --pink: #F06C9F; --pink-soft: #3A1B28; --pink-ink: #FFD6E5;
+  --warn-bg: #3A2E0E; --warn-ink: #F5D27A; --bad: #FF8A80; color-scheme: dark;
+} }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-ko); }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--jade); outline-offset: 2px; }
+[lang="th"] { font-family: var(--f-thai); }
+#app { height: 100%; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); }
+.wrap { max-width: 720px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); width: 100%; }
+header { background: var(--surface); border-bottom: 1px solid var(--line); flex: none; }
+.bar { display: flex; align-items: center; gap: 10px; padding-block: 10px; }
+.brand { margin-right: auto; display: flex; align-items: baseline; gap: 8px; }
+.brand b { font-family: var(--f-display); font-size: 22px; color: var(--jade); }
+.brand span { color: var(--muted); font-size: 13px; }
+.icon-btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; min-width: 38px; height: 38px; padding: 0 10px; display: grid; place-items: center; }
+.icon-btn[aria-pressed="true"] { background: var(--jade); color: var(--jade-ink); border-color: var(--jade); }
+main { flex: 1; overflow-y: auto; }
+.list { display: flex; flex-direction: column; gap: 12px; padding-block: 16px 24px; }
+.empty { color: var(--muted); text-align: center; padding: 32px 8px; }
+.empty b { color: var(--ink); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+.card.th { border-left: 4px solid var(--pink); }
+.card.ko { border-left: 4px solid var(--jade); }
+.card .dir { font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.card .heard { color: var(--muted); margin-top: 4px; overflow-wrap: anywhere; }
+.card .out { font-size: 22px; font-weight: 600; line-height: 1.4; margin-top: 4px; overflow-wrap: anywhere; }
+.card .out[lang="th"] { font-size: 24px; }
+.card .read { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.card .read b { color: var(--pink); font-weight: 600; }
+.card .note { font-size: 13px; background: var(--warn-bg); color: var(--warn-ink); border-radius: 8px; padding: 4px 8px; margin-top: 6px; }
+.card .acts { display: flex; gap: 6px; margin-top: 8px; }
+.chip { border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 3px 12px; font-size: 13px; }
+.card.pending .out { color: var(--muted); font-size: 16px; font-weight: 500; }
+.dock { flex: none; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
+.status { display: flex; align-items: center; gap: 10px; padding-top: 10px; min-height: 34px; }
+.status .txt { flex: 1; font-size: 14px; }
+.status .txt b { color: var(--jade); }
+.meter { width: 70px; height: 8px; background: var(--surface-2); border-radius: 99px; overflow: hidden; flex: none; }
+.meter i { display: block; height: 100%; width: 0; background: var(--jade); border-radius: 99px; transition: width .08s linear; }
+.seg { display: flex; background: var(--surface-2); border-radius: 999px; padding: 3px; gap: 3px; margin-top: 8px; }
+.seg button { flex: 1; border: 0; background: transparent; border-radius: 999px; padding: 6px 8px; font-size: 14px; font-weight: 500; }
+.seg button[aria-selected="true"] { background: var(--surface); color: var(--jade); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.big { display: flex; gap: 10px; margin-top: 10px; }
+.big button { flex: 1; min-height: 64px; border-radius: 16px; border: 0; font-size: 18px; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.25; }
+.big button small { font-size: 12px; font-weight: 400; opacity: .85; }
+.go { background: var(--jade); color: var(--jade-ink); }
+.go.on { background: var(--pink); color: #fff; }
+.b-ko { background: var(--jade); color: var(--jade-ink); }
+.b-th { background: var(--pink); color: #fff; }
+.big button.live { box-shadow: 0 0 0 4px var(--warn-bg), 0 0 0 6px var(--warn-ink); }
+.typing { display: flex; gap: 8px; margin-top: 10px; }
+.typing input { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--bg); border-radius: 12px; padding: 9px 12px; }
+.typing button { border: 0; background: var(--surface-2); border-radius: 12px; padding: 0 14px; font-weight: 600; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+.panel h2 { font-size: 17px; margin: 0; }
+.panel ol { margin: 0; padding-left: 20px; }
+.panel label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.panel select, .panel input[type=password], .panel input[type=text] { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 8px 10px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row input { flex: 1; min-width: 180px; }
+.btn { border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 8px 14px; font-weight: 500; }
+.btn.primary { background: var(--jade); color: var(--jade-ink); border-color: var(--jade); }
+.help { font-size: 13px; color: var(--muted); }
+.ok { font-size: 13px; color: var(--jade); }
+.bad { font-size: 13px; color: var(--bad); }
+a { color: var(--jade); }
+#show { position: fixed; inset: 0; background: var(--surface); z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; gap: 16px; }
+#show .t { font-size: clamp(30px, 8vw, 56px); font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+#show .s { color: var(--muted); font-size: 18px; }
+#show .x { position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); right: 16px; }
+.toast { position: fixed; left: 50%; bottom: 200px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 10px; font-size: 14px; z-index: 60; max-width: 90vw; text-align: center; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header><div class="wrap bar">
+    <div class="brand"><b>ล่าม</b><span>한국어 ⇄ ภาษาไทย 자동 통역</span></div>
+    <button class="icon-btn" id="btnSet" aria-pressed="false" title="설정">설정</button>
+  </div></header>
+  <main id="main"><div class="wrap">
+    <section id="setup" class="panel" hidden></section>
+    <section id="settings" class="panel" hidden></section>
+    <div class="list" id="list"></div>
+  </div></main>
+  <div class="dock"><div class="wrap">
+    <div class="status"><div class="txt" id="status">시작을 누르면 듣기 시작해요</div><button class="chip" id="calBtn" type="button" title="TV 소리 크기를 재서 그보다 큰 목소리만 들어요">주변 소리 재기</button><div class="meter" aria-hidden="true"><i id="meter"></i></div></div>
+    <div class="seg" role="tablist">
+      <button role="tab" id="mAuto" aria-selected="true">자동 감지</button>
+      <button role="tab" id="mBtn" aria-selected="false">눌러서 말하기</button>
+    </div>
+    <div class="big" id="autoCtl"><button class="go" id="go">시작<small>한국어든 태국어든 그냥 말하세요</small></button></div>
+    <div class="big" id="btnCtl" hidden>
+      <button class="b-ko" id="sayKo">한국어로 말하기<small>태국어로 바꿔 읽어 줘요</small></button>
+      <button class="b-th" id="sayTh" lang="th">พูดภาษาไทย<small lang="ko">한국어로 바꿔 읽어 줘요</small></button>
+    </div>
+    <form class="typing" id="typeForm"><input id="typeIn" placeholder="글로 쓰기 (한국어 또는 태국어)" autocomplete="off" enterkeyhint="send"><button type="submit">번역</button></form>
+  </div></div>
+</div>
+<div id="show" hidden role="dialog" aria-modal="true" aria-label="크게 보기"><button class="btn x" id="showX">닫기</button><div class="t" id="showT"></div><div class="s" id="showS"></div></div>
+<script>
+"use strict";
+// ---------- small helpers ----------
+const $ = (id) => document.getElementById(id);
+function el(tag, props, ...kids) {
+  const n = document.createElement(tag);
+  if (props) for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) n.append(c.nodeType ? c : String(c));
+  return n;
+}
+function lsGet(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+let toastTimer;
+function toast(msg) { document.querySelector(".toast")?.remove(); const t = el("div", { class: "toast", role: "status", text: msg }); document.body.append(t); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 3500); }
+const isThai = (s) => /[฀-๿]/.test(s);
+
+// ---------- state ----------
+// the Gemini key and model list are shared with the free conversation page (same keys in this browser)
+let apiKey = lsGet("thai.gemini.key", "");
+let models = lsGet("thai.gemini.models", []);
+const settings = Object.assign({ model: "", gender: "m", sens: "mid", silence: 900, rate: 0.9, mode: "auto", showReading: true }, lsGet("interp.settings", {}));
+const saveSettings = () => lsSet("interp.settings", settings);
+let log = lsGet("interp.log", []);
+const saveLog = () => { log = log.slice(-80); lsSet("interp.log", log); };
+
+// ---------- Gemini (free tier) ----------
+const API = "https://generativelanguage.googleapis.com/v1beta";
+async function apiError(r) {
+  let j = null; try { j = await r.json(); } catch {}
+  const m = j?.error?.message || "";
+  if (r.status === 400 && /api key/i.test(m)) return { code: "key", msg: "키가 맞지 않아요. 설정에서 키를 다시 넣어 주세요." };
+  if (r.status === 400) return { code: "bad", msg: m };
+  if (r.status === 403) return { code: "key", msg: "이 키로는 쓸 수 없어요. AI Studio에서 새 키를 만들어 보세요." };
+  if (r.status === 429) return { code: "quota", msg: "무료 사용 한도에 걸렸어요. 1분쯤 뒤에 다시 하거나, 설정에서 'lite' 모델로 바꿔 보세요." };
+  if (r.status === 404) return { code: "model", msg: "선택한 모델을 찾지 못했어요." };
+  if (r.status >= 500) return { code: "busy", msg: "구글 AI 서버가 바빠요. 잠시 뒤 다시 말해 주세요." };
+  return { code: "error", msg: "통역 결과를 받지 못했어요. 다시 말해 주세요." };
+}
+async function listModels(key) {
+  let r;
+  try { r = await fetch(API + "/models?pageSize=200", { headers: { "x-goog-api-key": key } }); } catch { throw { msg: "인터넷 연결을 확인해 주세요." }; }
+  if (!r.ok) throw await apiError(r);
+  const j = await r.json();
+  return (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
+    .map(m => String(m.name).replace(/^models\//, ""))
+    .filter(n => /^gemini/.test(n) && /flash/.test(n) && !/(image|tts|audio|live|embed|robotics|computer|thinking-exp)/.test(n));
+}
+function defaultModel(list) {
+  if (list.includes("gemini-flash-latest")) return "gemini-flash-latest";
+  const ver = (n) => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || "0");
+  const score = (n) => ver(n) * 100 - (/lite/.test(n) ? 30 : 0) - (/(preview|exp)/.test(n) ? 20 : 0);
+  return [...list].sort((a, b) => score(b) - score(a))[0] || "gemini-flash-latest";
+}
+function parseJSON(text) {
+  const t = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+  try { return JSON.parse(t); } catch {}
+  const a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch {} }
+  throw { code: "json", msg: "통역 결과를 읽지 못했어요. 다시 말해 주세요." };
+}
+let noThinkCfg = lsGet("interp.noThinkCfg", false);   // some models reject thinkingConfig; remember and stop sending it
+async function gemini(system, parts, retried) {
+  const model = settings.model || defaultModel(models);
+  const gen = { responseMimeType: "application/json", temperature: 0.2 };
+  if (!noThinkCfg) gen.thinkingConfig = { thinkingBudget: 0 };   // translation is quicker without "thinking"
+  let r;
+  try {
+    r = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts }], generationConfig: gen }),
+    });
+  } catch { throw { code: "net", msg: "인터넷 연결을 확인해 주세요." }; }
+  if (!r.ok) {
+    const err = await apiError(r);
+    if (err.code === "bad" && !noThinkCfg && /thinking/i.test(err.msg)) { noThinkCfg = true; lsSet("interp.noThinkCfg", true); return gemini(system, parts, retried); }
+    if (err.code === "bad") err.msg = "통역 요청이 거절됐어요. 다시 말해 주세요.";
+    if (err.code === "model" && !retried) {
+      try { models = await listModels(apiKey); lsSet("thai.gemini.models", models); settings.model = defaultModel(models); saveSettings(); return gemini(system, parts, true); } catch {}
+    }
+    throw err;
+  }
+  const j = await r.json();
+  const text = (j.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || "").join("");
+  if (!text) throw { code: "blocked", msg: "이 말은 통역 결과를 받지 못했어요." };
+  return parseJSON(text);
+}
+function systemPrompt() {
+  const me = settings.gender === "f" ? "female (use ค่ะ / คะ)" : "male (use ครับ)";
+  return `You are a live interpreter between Korean and Thai. The user is a Korean traveler (${me}) talking face to face with Thai people; both sides speak into the same phone.
+For each input (an audio clip or a typed text):
+1. Decide the language: "ko" (Korean) or "th" (Thai). If the audio is silence, noise, unclear, or another language, return lang "none" and leave the other fields empty.
+   The phone is in a room that may have a TV, radio, video or other people talking in the background. Interpret only a person speaking close to the phone, addressing the other person.
+   If the clip is mainly background media or distant voices (TV-like sound: music, announcer or drama voices, laughter tracks, ads, far-away chatter), return lang "none".${settings.sens === "near" ? " Be strict: when unsure whether the voice is close to the phone, return \"none\"." : ""}
+2. heard: exactly what was said, in its own script (Hangul for Korean, Thai script for Thai). Do not translate here.
+3. translation: what a native speaker would naturally say in the other language.
+   Korean → Thai: polite everyday spoken Thai; end with the right polite particle for the user's gender where natural.
+   Thai → Korean: natural polite Korean (해요체).
+   Keep names, numbers, prices, times and places exact (write numbers as Arabic digits). No explanations inside the translation.
+4. For the Thai sentence (heard when lang is "th", translation when lang is "ko"):
+   th_roman: easy romanization with tone marks (Paiboon style, e.g. "sà-wàt-dii khráp");
+   th_hangul: Hangul pronunciation guide a Korean can read aloud (keep aspiration distinct: ก=ㄲ, ค=ㅋ, ต=ㄸ, ท=ㅌ, ป=ㅃ, พ=ㅍ).
+5. note: a very short Korean note only if something is ambiguous or culturally important (e.g. a price that sounds too high, a polite form to use); otherwise "".
+Answer with JSON only: {"lang":"ko|th|none","heard":"","translation":"","th_roman":"","th_hangul":"","note":""}`;
+}
+function contextText() {
+  const recent = log.slice(-4).map(x => `${x.lang === "ko" ? "Korean" : "Thai"}: ${x.heard} => ${x.translation}`).join("\n");
+  return recent ? `Recent conversation (for context only):\n${recent}\n\n` : "";
+}
+
+// ---------- speech out (browser voices, free) ----------
+const canSpeak = "speechSynthesis" in window;
+let thVoice = null, koVoice = null;
+function pickVoices() {
+  if (!canSpeak) return;
+  const vs = speechSynthesis.getVoices();
+  const best = (re) => { const c = vs.filter(v => re.test(v.lang)); return c.find(v => /google|premium|enhanced|natural|online/i.test(v.name)) || c[0] || null; };
+  thVoice = best(/^th([-_]|$)/i); koVoice = best(/^ko([-_]|$)/i);
+}
+if (canSpeak) { pickVoices(); speechSynthesis.addEventListener?.("voiceschanged", pickVoices); }
+let speaking = false, speakToken = 0;
+function stopSpeaking() { speakToken++; if (canSpeak) speechSynthesis.cancel(); speaking = false; }
+function speak(text, lang) {
+  stopSpeaking();
+  if (!canSpeak || !text) return Promise.resolve();
+  if ((lang === "th" ? !thVoice : !koVoice) && speechSynthesis.getVoices().length && !speak.warned) {   // the whole point is hearing the other language: say so if the voice is missing
+    speak.warned = true;
+    toast(lang === "th" ? "이 기기에 태국어 음성이 없어 소리가 안 날 수 있어요. 설정 → 음성(언어)에서 태국어를 추가해 주세요." : "이 기기에 한국어 음성이 없어 소리가 안 날 수 있어요.");
+  }
+  const my = speakToken; speaking = true; updateListening();
+  return new Promise(res => {
+    const u = new SpeechSynthesisUtterance(text);
+    const v = lang === "ko" ? koVoice : thVoice;
+    u.lang = v?.lang || (lang === "ko" ? "ko-KR" : "th-TH"); if (v) u.voice = v;
+    u.rate = lang === "ko" ? Math.min(1.1, settings.rate + 0.1) : settings.rate;
+    const done = () => { clearTimeout(guard); if (my === speakToken) speaking = false; setTimeout(() => { updateListening(); res(); }, 350); };   // short gap so the mic does not hear the phone's own voice
+    const guard = setTimeout(done, 5000 + text.length * 260);
+    u.onend = u.onerror = done;
+    speechSynthesis.speak(u);
+  });
+}
+
+// ---------- microphone + voice activity detection ----------
+// The phone listens all the time; when someone talks it records until a short silence, then sends that clip to Gemini,
+// which hears whether it was Korean or Thai and translates it. While translating or reading aloud, listening pauses.
+// amb: how far above the measured room sound (TV etc., "주변 소리 재기") a voice must be; minVoice: shortest speech that counts
+const SENS = { near: { mult: 5, floor: 0.04, amb: 3.5, minVoice: 500 }, low: { mult: 4, floor: 0.02, amb: 2.5, minVoice: 400 },
+  mid: { mult: 2.8, floor: 0.012, amb: 1.8, minVoice: 350 }, high: { mult: 2, floor: 0.007, amb: 1.4, minVoice: 300 } };
+let calib = null;   // { until, vals } while measuring the room sound
+let ac = null, stream = null, proc = null, micReady = false;
+let running = false;     // auto mode switched on
+let manualLang = "";     // "ko" | "th" while a 'press to talk' button is armed
+let busy = false;        // a clip is being translated
+let rec = null, pre = [], loud = 0, noise = 0.01, level = 0, armedAt = 0;
+let wakeLock = null;
+const listening = () => micReady && !busy && !speaking && (running || manualLang);
+
+async function ensureMic() {
+  if (micReady) { if (ac.state !== "running") await ac.resume(); return true; }
+  if (!navigator.mediaDevices?.getUserMedia) { toast("이 브라우저는 마이크를 쓸 수 없어요. 아래 글쓰기 칸을 써 주세요."); return false; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  ac = ac || new AC(); ac.resume();   // created inside the tap so iPhone allows it
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } }); }
+  catch (e) {
+    setStatus(e?.name === "NotAllowedError" ? "마이크가 허용되지 않았어요. 주소창 왼쪽 자물쇠(아이폰은 aA) → 마이크 → 허용으로 바꿔 주세요." : "마이크를 켜지 못했어요. 다른 앱이 마이크를 쓰고 있는지 확인해 주세요.");
+    return false;
+  }
+  const src = ac.createMediaStreamSource(stream);
+  proc = ac.createScriptProcessor(2048, 1, 1);
+  const mute = ac.createGain(); mute.gain.value = 0;
+  src.connect(proc); proc.connect(mute); mute.connect(ac.destination);
+  proc.onaudioprocess = onAudio;
+  micReady = true;
+  return true;
+}
+function onAudio(e) {
+  const d = e.inputBuffer.getChannelData(0);
+  let s = 0; for (let i = 0; i < d.length; i++) s += d[i] * d[i];
+  const rms = Math.sqrt(s / d.length); level = rms;
+  if (calib) { calib.vals.push(rms); if (performance.now() >= calib.until) finishCalib(); return; }
+  if (!listening()) { rec = null; pre = []; loud = 0; return; }
+  const ms = d.length / ac.sampleRate * 1000, cfg = SENS[settings.sens] || SENS.mid;
+  const thr = Math.max(cfg.floor, noise * cfg.mult, (settings.ambient || 0) * cfg.amb), buf = new Float32Array(d);
+  if (!rec) {
+    pre.push(buf); while (pre.length > Math.ceil(400 / ms)) pre.shift();   // keep 0.4 s before the voice starts
+    if (rms > thr) {
+      if (++loud >= (manualLang ? 1 : 2)) { rec = { chunks: pre.slice(), voiced: loud * ms, silent: 0, dur: 0 }; pre = []; setStatus("<b>듣는 중…</b> 말이 끝나면 잠깐 멈춰 주세요"); }
+    } else {
+      loud = 0; noise = noise * 0.97 + rms * 0.03;   // slowly learn the room's background noise
+      if (manualLang && performance.now() - armedAt > 8000) { const l = manualLang; disarm(); setStatus(l === "ko" ? "말소리가 없어서 멈췄어요" : "ไม่ได้ยินเสียง · 말소리가 없어서 멈췄어요"); }
+    }
+    return;
+  }
+  rec.chunks.push(buf); rec.dur += ms;
+  if (rms > thr * 0.75) { rec.voiced += ms; rec.silent = 0; } else rec.silent += ms;
+  if (rec.silent >= settings.silence || rec.dur >= 15000) {
+    const r = rec, hint = manualLang; rec = null; loud = 0;
+    if (manualLang) disarm(true);
+    if (r.voiced < cfg.minVoice) { setStatus(running ? "<b>듣고 있어요</b> · 한국어든 태국어든 말하세요" : "너무 짧아서 넘어갔어요"); return; }
+    translateClip(r.chunks, hint);
+  }
+}
+// "주변 소리 재기": 3 seconds of the room as it is (TV on, nobody talking to the phone); voices must then be clearly louder than that
+async function startCalib() {
+  if (calib) return;
+  if (!(await ensureMic())) return;
+  stopSpeaking(); rec = null;
+  calib = { until: performance.now() + 3000, vals: [] };
+  setStatus("<b>주변 소리 재는 중… 3초</b> · 말하지 말고 TV는 평소처럼 켜 두세요");
+}
+function finishCalib() {
+  const v = calib.vals.sort((a, b) => a - b); calib = null;
+  const amb = v.length ? v[Math.floor(v.length * 0.9)] : 0;   // the loud end of the room sound, not its average
+  settings.ambient = Math.round(amb * 10000) / 10000; saveSettings();
+  const word = amb < 0.01 ? "조용해요" : amb < 0.03 ? "조금 시끄러워요" : amb < 0.07 ? "시끄러워요" : "아주 시끄러워요";
+  const msg = `주변 소리: ${word}. 이것보다 확실히 큰 목소리만 들을게요` + (amb >= 0.03 && settings.sens !== "near" ? " · 휴대폰에 가까이 대고 말하세요" : "");
+  setStatus(msg); toast(msg);
+  if (!$("settings").hidden) renderSettings();
+  setTimeout(updateListening, 2500);
+}
+function meterLoop() { $("meter").style.width = Math.min(100, level * 900) + "%"; requestAnimationFrame(meterLoop); }
+requestAnimationFrame(meterLoop);
+function updateListening() {
+  if (busy) return;
+  if (speaking) { setStatus("<b>읽어 주는 중…</b>"); return; }
+  if (running) setStatus("<b>듣고 있어요</b> · 한국어든 태국어든 말하세요");
+  else if (manualLang) setStatus(manualLang === "ko" ? "<b>한국어로 말하세요</b>" : "<b lang='th'>พูดได้เลยครับ/ค่ะ</b> · 태국어로 말하세요");
+}
+
+// ---------- audio clip → WAV (16 kHz mono) → base64 ----------
+function toWavBase64(chunks, rate) {
+  let n = 0; for (const c of chunks) n += c.length;
+  const all = new Float32Array(n); let o = 0; for (const c of chunks) { all.set(c, o); o += c.length; }
+  const outRate = 16000, ratio = rate / outRate, len = Math.floor(all.length / ratio), out = new Float32Array(len);
+  let peak = 0;
+  for (let i = 0; i < len; i++) { const a = Math.floor(i * ratio), b = Math.min(all.length, Math.floor((i + 1) * ratio)); let s = 0; for (let k = a; k < b; k++) s += all[k]; out[i] = s / Math.max(1, b - a); peak = Math.max(peak, Math.abs(out[i])); }
+  const gain = peak > 0 && peak < 0.5 ? Math.min(8, 0.9 / peak) : 1;   // quiet speech: make it louder for the recogniser
+  const buf = new ArrayBuffer(44 + len * 2), v = new DataView(buf);
+  const str = (p, s) => { for (let i = 0; i < s.length; i++) v.setUint8(p + i, s.charCodeAt(i)); };
+  str(0, "RIFF"); v.setUint32(4, 36 + len * 2, true); str(8, "WAVE"); str(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, outRate, true); v.setUint32(28, outRate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, "data"); v.setUint32(40, len * 2, true);
+  for (let i = 0; i < len; i++) { const x = Math.max(-1, Math.min(1, out[i] * gain)); v.setInt16(44 + i * 2, x < 0 ? x * 0x8000 : x * 0x7fff, true); }
+  const bytes = new Uint8Array(buf); let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+// ---------- translate ----------
+async function translateClip(chunks, hint) {
+  const data = toWavBase64(chunks, ac.sampleRate);
+  const ask = contextText() + (hint ? `The speaker pressed the ${hint === "ko" ? "Korean" : "Thai"} button, so this is most likely ${hint === "ko" ? "Korean" : "Thai"}.\n` : "") + "Interpret this audio.";
+  await runTranslate([{ inlineData: { mimeType: "audio/wav", data } }, { text: ask }], hint);
+}
+async function translateText(text) {
+  const hint = isThai(text) ? "th" : "ko";
+  await runTranslate([{ text: contextText() + `Typed text (${hint === "ko" ? "Korean" : "Thai"}):\n${text}` }], hint, text);
+}
+async function runTranslate(parts, hint, typed) {
+  if (!apiKey) { showSetup(true); toast("먼저 무료 AI 키를 넣어 주세요"); return; }
+  busy = true; setStatus("<b>통역하는 중…</b>");
+  const pending = el("div", { class: "card pending" }, el("div", { class: "dir", text: typed ? "글로 쓴 말" : "알아듣는 중…" }), el("div", { class: "out", text: typed || "잠깐만요…" }));
+  $("list").append(pending); scrollDown();
+  try {
+    const r = await gemini(systemPrompt(), parts);
+    pending.remove();
+    const lang = r.lang === "th" || r.lang === "ko" ? r.lang : (typed ? hint : "none");
+    if (lang === "none" || !String(r.translation || "").trim()) { setStatus("말소리를 알아듣지 못했어요. 다시 말해 주세요."); return; }
+    const item = { id: Date.now(), lang, heard: String(r.heard || typed || ""), translation: String(r.translation), th_roman: String(r.th_roman || ""), th_hangul: String(r.th_hangul || ""), note: String(r.note || "") };
+    log.push(item); saveLog(); $("list").append(card(item)); scrollDown();
+    busy = false;
+    await speak(item.translation, lang === "ko" ? "th" : "ko");
+  } catch (e) {
+    pending.remove();
+    setStatus(e?.msg || "통역하지 못했어요. 다시 말해 주세요.");
+    if (e?.code === "quota" || e?.code === "key") stopAuto(e.msg);
+    if (e?.code === "key") showSetup(true);
+  } finally { busy = false; if (!speaking) updateListening(); }
+}
+
+// ---------- UI ----------
+function setStatus(html) { $("status").innerHTML = html; }
+function scrollDown() { const m = $("main"); m.scrollTop = m.scrollHeight; }
+function card(x) {
+  const toTh = x.lang === "ko";
+  const thLine = toTh ? x.translation : x.heard;
+  const read = settings.showReading && (x.th_hangul || x.th_roman)
+    ? el("div", { class: "read" }, x.th_hangul ? el("b", { text: x.th_hangul }) : null, x.th_hangul && x.th_roman ? " · " : null, x.th_roman || null) : null;
+  return el("div", { class: "card " + (toTh ? "ko" : "th") },
+    el("div", { class: "dir" }, toTh ? "🇰🇷 한국어 → 🇹🇭 태국어" : "🇹🇭 ภาษาไทย → 🇰🇷 한국어"),
+    el("div", { class: "heard", lang: toTh ? "ko" : "th", text: x.heard }),
+    !toTh && read ? read : null,
+    el("div", { class: "out", lang: toTh ? "th" : "ko", text: x.translation }),
+    toTh && read ? read : null,
+    x.note ? el("div", { class: "note", text: x.note }) : null,
+    el("div", { class: "acts" },
+      el("button", { class: "chip", type: "button", text: "▶ 다시 듣기", onclick: () => speak(x.translation, toTh ? "th" : "ko") }),
+      el("button", { class: "chip", type: "button", text: "크게 보여주기", onclick: () => showBig(x) }),
+      toTh ? null : el("button", { class: "chip", type: "button", lang: "th", text: "▶ ไทย", title: "태국어 원문 듣기", onclick: () => speak(thLine, "th") })));
+}
+function renderList() {
+  const L = $("list"); L.replaceChildren();
+  if (!log.length) L.append(el("div", { class: "empty" }, el("b", { text: "시작을 누르고 말해 보세요." }), el("br"), "한국어로 말하면 태국어로, 태국어로 말하면 한국어로 바꿔서 읽어 줘요.", el("br"), "휴대폰을 두 사람 사이에 두고 번갈아 말하면 돼요."));
+  for (const x of log) L.append(card(x));
+  scrollDown();
+}
+function showBig(x) {
+  const toTh = x.lang === "ko";
+  $("showT").textContent = x.translation; $("showT").lang = toTh ? "th" : "ko";
+  $("showS").textContent = toTh ? (x.th_hangul || "") : x.heard; $("showS").lang = toTh ? "ko" : "th";
+  $("show").hidden = false;
+}
+$("showX").onclick = () => { $("show").hidden = true; };
+$("show").addEventListener("click", (e) => { if (e.target.id === "show") $("show").hidden = true; });
+
+function unlockSpeech() { if (canSpeak) { try { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); } catch {} } }   // iPhone: allow later reading aloud
+async function keepAwake(on) {
+  try {
+    if (on && "wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => { wakeLock = null; }); }
+    if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch {}
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && running) keepAwake(true); });
+
+async function startAuto() {
+  if (!apiKey) { showSetup(true); toast("먼저 무료 AI 키를 넣어 주세요"); return; }
+  unlockSpeech();
+  if (!(await ensureMic())) return;
+  running = true; noise = 0.01; keepAwake(true);
+  $("go").classList.add("on"); $("go").replaceChildren("멈추기", el("small", { text: "누르면 듣기를 멈춰요" }));
+  updateListening();
+}
+function stopAuto(msg) {
+  running = false; rec = null; keepAwake(false);
+  $("go").classList.remove("on"); $("go").replaceChildren("시작", el("small", { text: "한국어든 태국어든 그냥 말하세요" }));
+  if (!busy) setStatus(msg || "멈췄어요. 시작을 누르면 다시 들어요");
+}
+$("go").onclick = () => (running ? stopAuto() : startAuto());
+$("calBtn").onclick = startCalib;
+
+async function arm(lang) {
+  if (!apiKey) { showSetup(true); toast("먼저 무료 AI 키를 넣어 주세요"); return; }
+  if (manualLang === lang) { disarm(); setStatus("취소했어요"); return; }
+  unlockSpeech(); stopSpeaking();
+  if (!(await ensureMic())) return;
+  manualLang = lang; armedAt = performance.now(); rec = null; pre = []; loud = 0;
+  $("sayKo").classList.toggle("live", lang === "ko"); $("sayTh").classList.toggle("live", lang === "th");
+  updateListening();
+}
+function disarm(keepStatus) { manualLang = ""; $("sayKo").classList.remove("live"); $("sayTh").classList.remove("live"); if (!keepStatus && !busy) setStatus("말할 언어 버튼을 누르세요"); }
+$("sayKo").onclick = () => arm("ko");
+$("sayTh").onclick = () => arm("th");
+
+function setMode(m) {
+  settings.mode = m; saveSettings();
+  $("mAuto").setAttribute("aria-selected", String(m === "auto")); $("mBtn").setAttribute("aria-selected", String(m === "btn"));
+  $("autoCtl").hidden = m !== "auto"; $("btnCtl").hidden = m !== "btn";
+  if (m === "btn") { stopAuto(); setStatus("말할 언어 버튼을 누르고 말하세요"); } else { disarm(true); setStatus("시작을 누르면 듣기 시작해요"); }
+}
+$("mAuto").onclick = () => setMode("auto");
+$("mBtn").onclick = () => setMode("btn");
+
+$("typeForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const t = $("typeIn").value.trim(); if (!t || busy) return;
+  unlockSpeech(); $("typeIn").value = ""; translateText(t);
+});
+
+// ---------- key setup + settings ----------
+function keyBox() {
+  const inp = el("input", { type: "password", placeholder: "AIza로 시작하는 키를 붙여 넣기", autocomplete: "off", spellcheck: "false", value: apiKey });
+  const st = el("div", { class: apiKey ? "ok" : "help", text: apiKey ? `키 저장됨 · 모델: ${settings.model || defaultModel(models)}` : "키는 이 기기 브라우저에만 저장되고, 구글 AI 서버로만 보내져요." });
+  const save = el("button", { class: "btn primary", type: "button", text: "키 확인하고 저장" });
+  save.onclick = async () => {
+    const k = inp.value.trim(); if (!k) { st.className = "bad"; st.textContent = "키를 붙여 넣어 주세요."; return; }
+    save.disabled = true; st.className = "help"; st.textContent = "키를 확인하는 중…";
+    try {
+      const list = await listModels(k);
+      if (!list.length) throw { msg: "이 키로 쓸 수 있는 모델을 찾지 못했어요." };
+      apiKey = k; lsSet("thai.gemini.key", k); models = list; lsSet("thai.gemini.models", list);
+      if (!list.includes(settings.model)) settings.model = defaultModel(list);
+      saveSettings(); st.className = "ok"; st.textContent = `키 확인 완료 · 모델: ${settings.model}`;
+      toast("키를 저장했어요. 시작을 눌러 보세요"); showSetup(false); if (!$("settings").hidden) renderSettings();
+    } catch (e) { st.className = "bad"; st.textContent = e?.msg || "키를 확인하지 못했어요."; }
+    finally { save.disabled = false; }
+  };
+  return el("div", null, el("div", { class: "row" }, inp, el("button", { class: "btn", type: "button", text: "보기", onclick: () => { inp.type = inp.type === "password" ? "text" : "password"; } }), save), st);
+}
+function showSetup(on) {
+  const s = $("setup"); s.hidden = !on; if (!on) return;
+  s.replaceChildren(el("h2", { text: "처음 한 번만: 무료 AI 키 넣기" }),
+    el("ol", null,
+      el("li", null, "구글 계정으로 ", el("a", { href: "https://aistudio.google.com/app/apikey", target: "_blank", rel: "noopener", text: "Google AI Studio 키 페이지" }), "에 들어가요."),
+      el("li", { text: "'API 키 만들기(Create API key)'를 눌러요. 카드 등록 없이 무료예요." }),
+      el("li", { text: "만들어진 키(AIza…)를 복사해서 아래 칸에 붙여 넣고 저장해요." })),
+    keyBox(),
+    el("div", { class: "help", text: "태국어 회화 무료판에서 이미 키를 넣었다면, 같은 주소(같은 브라우저)에서는 자동으로 같이 써요." }));
+}
+function renderSettings() {
+  const s = $("settings");
+  const sel = (label, key, opts, conv = (v) => v) => el("label", null, label, (() => {
+    const x = el("select", null, opts.map(([v, t]) => el("option", { value: v, selected: String(settings[key]) === String(v) }, t)));
+    x.onchange = () => { settings[key] = conv(x.value); saveSettings(); if (key === "showReading") renderList(); };
+    return x;
+  })());
+  const modelOpts = (models.length ? models : [settings.model || "gemini-flash-latest"]).map(m => [m, m + (/lite/.test(m) ? " (가볍고 한도 넉넉)" : "")]);
+  s.replaceChildren(
+    el("h2", { text: "설정" }),
+    el("div", null, el("div", { class: "help", text: "무료 AI 키" }), keyBox()),
+    sel("AI 모델", "model", modelOpts),
+    sel("내 성별 (태국어 끝말)", "gender", [["m", "남자 · ครับ (크랍)"], ["f", "여자 · ค่ะ (카)"]]),
+    sel("마이크 민감도", "sens", [["near", "가까운 목소리만 (TV 켜진 곳 · 휴대폰에 대고 말하기)"], ["low", "낮게 (시끄러운 곳)"], ["mid", "보통"], ["high", "높게 (조용한 곳, 작은 목소리)"]]),
+    el("div", null,
+      el("div", { class: "row" }, el("button", { class: "btn", type: "button", text: "주변 소리 재기 (3초)", onclick: startCalib }),
+        settings.ambient ? el("button", { class: "btn", type: "button", text: "기준 지우기", onclick: () => { settings.ambient = 0; saveSettings(); renderSettings(); toast("주변 소리 기준을 지웠어요"); } }) : null),
+      el("div", { class: "help", text: settings.ambient ? `주변 소리 기준이 있어요 (${settings.ambient}). TV 소리보다 확실히 큰 목소리만 들어요. 장소가 바뀌면 다시 재 주세요.` : "TV가 켜진 곳이면, 아무도 말하지 않을 때 눌러서 TV 소리 크기를 재 두세요. 그보다 큰 목소리만 들어요." })),
+    sel("말 끝을 기다리는 시간", "silence", [[600, "짧게 (0.6초)"], [900, "보통 (0.9초)"], [1400, "길게 (1.4초) · 천천히 말할 때"]], Number),
+    sel("읽어 주는 속도 (태국어)", "rate", [[0.7, "느리게"], [0.9, "보통"], [1.05, "빠르게"]], Number),
+    sel("태국어 발음 표시", "showReading", [["true", "보이기 (한글 발음 · 로마자)"], ["false", "숨기기"]], (v) => v === "true"),
+    el("div", { class: "help", text: `읽어 주기 목소리: 태국어 ${thVoice ? thVoice.name : "없음 (기기 설정에서 태국어 음성을 추가해 주세요)"} · 한국어 ${koVoice ? koVoice.name : "없음"}` }),
+    el("div", { class: "row" }, el("button", { class: "btn", type: "button", text: "대화 기록 지우기", onclick: () => { if (confirm("통역 기록을 모두 지울까요?")) { log = []; saveLog(); renderList(); } } })),
+    el("div", { class: "help", text: "무료 사용량에는 분당·하루 횟수 제한이 있어요. 말 한 번이 한 번으로 세어져요. 한도에 걸리면 잠시 기다리거나 'lite' 모델로 바꿔 주세요." }));
+}
+$("btnSet").onclick = () => {
+  const s = $("settings"), on = s.hidden; s.hidden = !on; $("btnSet").setAttribute("aria-pressed", String(on));
+  if (on) { renderSettings(); $("main").scrollTop = 0; }
+};
+
+// ---------- start ----------
+renderList();
+setMode(settings.mode === "btn" ? "btn" : "auto");
+if (!apiKey) showSetup(true);
+if (!window.isSecureContext && location.protocol !== "file:") setStatus("마이크를 쓰려면 https 주소로 열어야 해요");
+</script>
+</body>
+</html>

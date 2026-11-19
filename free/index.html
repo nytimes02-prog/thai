@@ -1,0 +1,983 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B7259">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>พูดเลย 태국어 회화</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-column phone-first app — header with tabs, scrolling chat, composer (with voice panel) at the bottom of the flex column. */
+:root {
+  --bg: #EFF4F1; --surface: #FFFFFF; --surface-2: #E3ECE7; --ink: #14211D; --muted: #5A6B65; --line: #D2DED8;
+  --jade: #0B7259; --jade-ink: #FFFFFF; --jade-soft: #D8EEE6;
+  --pink: #C93370; --pink-soft: #FBE3EC; --pink-ink: #5C1231;
+  --t-mid: #66788A; --t-low: #2A64CC; --t-fall: #CC4122; --t-high: #198A4A; --t-rise: #8045CF;
+  --warn-bg: #FFF2CF; --warn-ink: #6E4B00;
+  --f-display: "Bai Jamjuree", "IBM Plex Sans Thai", system-ui, sans-serif;
+  --f-thai: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif;
+  --f-ko: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --r: 14px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #0D1513; --surface: #16201D; --surface-2: #1E2B27; --ink: #E4EDEA; --muted: #92A59F; --line: #2A3934;
+  --jade: #3DC49E; --jade-ink: #052019; --jade-soft: #173A30;
+  --pink: #F06C9F; --pink-soft: #3A1B28; --pink-ink: #FFD6E5;
+  --t-mid: #9CADBA; --t-low: #73A2FF; --t-fall: #FF7C5E; --t-high: #4FD08A; --t-rise: #BA94FF;
+  --warn-bg: #3A2E0E; --warn-ink: #F5D27A; color-scheme: dark;
+} }
+html, body { height: 100%; margin: 0; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-ko); font-size: 15px; line-height: 1.5; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--jade); outline-offset: 2px; }
+.wrap { max-width: 760px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+[lang="th"] { font-family: var(--f-thai); }
+
+#app { height: 100%; display: flex; flex-direction: column; }
+header { background: var(--surface); border-bottom: 1px solid var(--line); flex: none; }
+.bar { display: flex; align-items: center; gap: 10px; padding-block: 10px; }
+.brand { display: flex; align-items: baseline; gap: 8px; margin-right: auto; min-width: 0; }
+.brand b { font-family: var(--f-display); font-size: 22px; font-weight: 700; color: var(--jade); }
+.brand span { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.tabs { display: flex; gap: 4px; background: var(--surface-2); padding: 3px; border-radius: 999px; }
+.tabs button { border: 0; background: transparent; padding: 6px 14px; border-radius: 999px; font-weight: 500; font-size: 14px; display: flex; gap: 6px; align-items: center; }
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--jade); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.badge { background: var(--pink); color: #fff; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 0 6px; line-height: 18px; min-width: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+.icon-btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; width: 38px; height: 38px; display: grid; place-items: center; flex: none; }
+.icon-btn svg { width: 20px; height: 20px; }
+.icon-btn[aria-pressed="true"] { background: var(--jade); border-color: var(--jade); color: var(--jade-ink); }
+
+main { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+.view { padding-block: 16px 24px; display: flex; flex-direction: column; gap: 16px; }
+.notice { background: var(--warn-bg); color: var(--warn-ink); border-radius: 12px; padding: 10px 14px; font-size: 14px; }
+.onboard { background: var(--surface); border: 2px solid var(--jade); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 10px; }
+.onboard ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; }
+.onboard a { color: var(--jade); font-weight: 600; }
+.keyrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.keyrow input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--bg); font-family: ui-monospace, monospace; font-size: 14px; }
+.ok { color: var(--jade); font-size: 13px; font-weight: 600; }
+.bad { color: var(--pink); font-size: 13px; font-weight: 600; }
+
+.scen-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+h2 { font-family: var(--f-display); font-size: 18px; margin: 0; text-wrap: balance; }
+.scen-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.scen { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: var(--r); padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; transition: border-color .15s, transform .1s; }
+.scen:hover { border-color: var(--jade); }
+.scen:active { transform: scale(.97); }
+.scen .th { font-family: var(--f-thai); font-size: 18px; font-weight: 600; }
+.scen .ko { font-size: 13px; color: var(--muted); }
+.scene-bar { display: flex; gap: 10px; align-items: center; background: var(--jade-soft); border-radius: var(--r); padding: 10px 12px; }
+.scene-bar .txt { flex: 1; min-width: 0; }
+.scene-bar .t1 { font-weight: 600; }
+.scene-bar .t1 [lang="th"] { margin-right: 6px; }
+.scene-bar .t2 { font-size: 13px; color: var(--muted); }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 12px; font-size: 14px; font-weight: 500; white-space: nowrap; }
+.btn.primary { background: var(--jade); border-color: var(--jade); color: var(--jade-ink); }
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .5; cursor: default; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 4px; }
+.legend svg { width: 18px; height: 12px; }
+
+.chat { display: flex; flex-direction: column; gap: 14px; }
+.example-cap { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.tag { font-size: 11px; font-weight: 600; letter-spacing: .06em; border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--muted); }
+.msg { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.who { font-size: 12px; color: var(--muted); font-weight: 500; }
+.ai-card { background: var(--surface); border: 1px solid var(--line); border-radius: 4px var(--r) var(--r) var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+.me { align-items: flex-end; }
+.me-bubble { background: var(--pink-soft); color: var(--pink-ink); border-radius: var(--r) 4px var(--r) var(--r); padding: 9px 14px; max-width: 88%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb { align-self: stretch; border: 1px dashed var(--pink); border-radius: var(--r); padding: 10px 14px; display: flex; flex-direction: column; gap: 10px; background: var(--surface); }
+.fb-title { font-size: 13px; font-weight: 600; color: var(--pink); }
+.fb-note { font-size: 14px; }
+.fb-alt-title { font-size: 12px; color: var(--muted); font-weight: 600; }
+.coach { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; }
+.coach b { color: var(--jade); font-weight: 600; }
+.sent { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sent + .sent { border-top: 1px solid var(--line); padding-top: 10px; }
+.th-row { display: flex; gap: 8px; align-items: flex-start; }
+.th-text { font-family: var(--f-thai); font-size: 21px; line-height: 1.55; font-weight: 500; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.mini { border: 0; background: var(--surface-2); width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; flex: none; color: var(--ink); }
+.mini svg { width: 16px; height: 16px; }
+.mini.on { color: var(--pink); }
+.mini.speaking { background: var(--jade); color: var(--jade-ink); }
+.syls { display: flex; flex-wrap: wrap; gap: 4px; }
+.syl { border: 0; background: transparent; padding: 2px 6px 3px; border-radius: 8px; display: inline-flex; flex-direction: column; align-items: center; line-height: 1.2; border-bottom: 3px solid currentColor; }
+.syl:hover { background: var(--surface-2); }
+.syl .s-th { font-family: var(--f-thai); font-size: 15px; color: var(--ink); }
+.syl .s-r { font-size: 12px; display: inline-flex; align-items: center; gap: 2px; }
+.syl svg { width: 14px; height: 10px; }
+.t-mid { color: var(--t-mid); } .t-low { color: var(--t-low); } .t-falling { color: var(--t-fall); } .t-high { color: var(--t-high); } .t-rising { color: var(--t-rise); }
+.pron { font-size: 15px; font-weight: 500; }
+.roman { font-size: 14px; color: var(--muted); font-style: italic; }
+.mean { font-size: 14px; color: var(--muted); }
+.mean::before { content: "뜻 "; font-size: 11px; font-weight: 600; color: var(--jade); margin-right: 2px; }
+.typing { display: inline-flex; gap: 4px; align-items: center; color: var(--muted); font-size: 14px; }
+.typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite; }
+.typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .25 } 40% { opacity: 1 } }
+.err { background: var(--warn-bg); color: var(--warn-ink); border-radius: 12px; padding: 10px 14px; font-size: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.composer { flex: none; background: var(--surface); border-top: 1px solid var(--line); }
+.composer > .wrap { padding-block: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+.hints { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.hints::-webkit-scrollbar { display: none; }
+.hint { flex: none; border: 1px solid var(--line); background: var(--bg); border-radius: 12px; padding: 5px 10px; text-align: left; max-width: 260px; display: flex; flex-direction: column; }
+.hint .h-th { font-family: var(--f-thai); font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hint .h-ko { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hints-label { font-size: 12px; color: var(--muted); flex: none; align-self: center; }
+.row { display: flex; gap: 8px; align-items: flex-end; }
+#input { flex: 1; min-width: 0; resize: none; border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px; background: var(--bg); max-height: 140px; line-height: 1.45; font-family: var(--f-ko), var(--f-thai); font-size: 16px; }
+#input:focus { outline: none; border-color: var(--jade); }
+.send { background: var(--jade); color: var(--jade-ink); border: 0; border-radius: 12px; height: 42px; padding: 0 16px; font-weight: 600; flex: none; }
+.send:disabled { opacity: .5; cursor: default; }
+.mic { width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; flex: none; position: relative; }
+.mic svg { width: 20px; height: 20px; }
+.mic.live { background: var(--pink); border-color: var(--pink); color: #fff; }
+.mic-lang { position: absolute; bottom: -2px; right: -4px; font-size: 9px; font-weight: 700; background: var(--ink); color: var(--bg); border-radius: 4px; padding: 0 3px; line-height: 13px; }
+.partial { font-size: 13px; color: var(--muted); font-style: italic; }
+.voice-toggle { height: 42px; border-radius: 12px; border: 1px solid var(--jade); background: var(--surface); color: var(--jade); font-weight: 600; padding: 0 10px; flex: none; display: flex; align-items: center; gap: 4px; font-size: 13px; }
+.voice-toggle svg { width: 18px; height: 18px; }
+
+/* voice panel */
+.voice { background: var(--jade-soft); border-radius: var(--r); padding: 12px; display: grid; gap: 10px; }
+.v-top { display: flex; align-items: center; gap: 12px; }
+.v-big { width: 64px; height: 64px; border-radius: 50%; border: 0; background: var(--jade); color: var(--jade-ink); display: grid; place-items: center; flex: none; position: relative; }
+.v-big svg { width: 28px; height: 28px; }
+.v-big.listening { background: var(--pink); color: #fff; }
+.v-big.listening::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 3px solid var(--pink); opacity: .5; animation: pulse 1.4s infinite; }
+@keyframes pulse { 0% { transform: scale(.9); opacity: .6 } 100% { transform: scale(1.15); opacity: 0 } }
+.v-status { flex: 1; min-width: 0; }
+.v-status b { display: block; font-size: 16px; }
+.v-status span { font-size: 13px; color: var(--muted); display: block; overflow-wrap: anywhere; }
+.v-opts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 10px; font-size: 13px; }
+.chip[aria-pressed="true"] { background: var(--jade); color: var(--jade-ink); border-color: var(--jade); }
+.v-off { margin-left: auto; border: 1px solid var(--pink); color: var(--pink); background: var(--surface); border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 600; }
+
+.settings { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 16px; }
+.field { display: grid; gap: 6px; }
+.field > label, .field > .lbl { font-size: 13px; font-weight: 600; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 5px 12px; font-size: 14px; }
+.seg button[aria-pressed="true"] { background: var(--jade); color: var(--jade-ink); border-color: var(--jade); }
+.help { font-size: 12px; color: var(--muted); }
+select { border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; background: var(--bg); max-width: 100%; }
+input[type="range"] { accent-color: var(--jade); width: 100%; max-width: 320px; }
+
+.stats { display: flex; gap: 8px; flex-wrap: wrap; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; display: flex; flex-direction: column; min-width: 90px; }
+.stat b { font-family: var(--f-display); font-size: 22px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 22px 18px; display: flex; flex-direction: column; gap: 14px; align-items: center; text-align: center; min-height: 230px; justify-content: center; }
+.card .front-ko { font-size: 20px; font-weight: 600; }
+.card .front-th { font-family: var(--f-thai); font-size: 28px; font-weight: 500; }
+.card .sent { align-items: center; text-align: center; width: 100%; }
+.card .th-row { justify-content: center; }
+.card .th-text { flex: none; }
+.card .syls { justify-content: center; }
+.card-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.qmeta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.list { display: flex; flex-direction: column; gap: 8px; }
+.item { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; gap: 10px; align-items: flex-start; }
+.item .body { flex: 1; min-width: 0; }
+.item .i-th { font-family: var(--f-thai); font-size: 18px; overflow-wrap: anywhere; }
+.item .i-sub { font-size: 13px; color: var(--muted); }
+.item .i-acts { display: flex; gap: 4px; flex: none; }
+.del.confirm { background: var(--pink); color: #fff; width: auto; padding: 0 8px; font-size: 12px; }
+#search { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--surface); width: 100%; }
+.empty { color: var(--muted); font-size: 14px; background: var(--surface); border: 1px dashed var(--line); border-radius: var(--r); padding: 18px; text-align: center; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(130px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 10px; font-size: 14px; z-index: 20; max-width: calc(100% - 32px); }
+@media (max-width: 480px) { .brand span { display: none; } .th-text { font-size: 19px; } .tabs button { padding: 6px 10px; } .voice-toggle span { display: none; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="wrap bar">
+      <div class="brand"><b lang="th">พูดเลย</b><span>태국어 회화 · 무료판</span></div>
+      <div class="tabs" role="tablist">
+        <button id="tab-talk" role="tab" aria-selected="true">회화</button>
+        <button id="tab-review" role="tab" aria-selected="false">복습 <span class="badge" id="due-badge" hidden>0</span></button>
+      </div>
+      <button class="icon-btn" id="btn-awake" aria-pressed="false" aria-label="화면 켜두기" title="화면 켜두기" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-settings" aria-label="설정" title="설정">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="wrap">
+      <section class="view" id="view-settings" hidden></section>
+      <section class="view" id="view-talk"></section>
+      <section class="view" id="view-review" hidden></section>
+    </div>
+  </main>
+
+  <div class="composer" id="composer">
+    <div class="wrap">
+      <div class="voice" id="voice" hidden>
+        <div class="v-top">
+          <button class="v-big" id="v-big" aria-label="말하기">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+          </button>
+          <div class="v-status" aria-live="polite"><b id="v-state">눌러서 말하세요</b><span id="v-sub"></span></div>
+        </div>
+        <div class="v-opts" id="v-opts"></div>
+      </div>
+      <div class="hints" id="hints" hidden></div>
+      <div class="partial" id="partial" hidden></div>
+      <div class="row">
+        <button class="voice-toggle" id="voice-toggle" title="음성 대화 모드">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/></svg><span>음성 대화</span>
+        </button>
+        <button class="mic" id="mic" aria-label="말로 입력" title="말로 입력" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+          <span class="mic-lang" id="mic-lang">TH</span>
+        </button>
+        <textarea id="input" rows="1" placeholder="태국어나 한국어로 써 보세요"></textarea>
+        <button class="send" id="send">보내기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+// ---------- data ----------
+const SCENARIOS = [
+  { id: "greet", th: "ทักทาย", ko: "인사·자기소개", who: "카페에서 만난 태국 친구", ai: "f",
+    role: "A friendly Thai woman (about 30) meeting the learner at a café in Bangkok. Small talk: names, where they are from, job, how long they have been in Thailand, hobbies." },
+  { id: "food", th: "สั่งอาหาร", ko: "식당 주문", who: "식당 직원", ai: "f",
+    role: "A server at a casual Thai made-to-order restaurant (ร้านอาหารตามสั่ง). Take the order, ask about spice level (เผ็ดไหม), drinks, then bring the bill (เช็คบิล)." },
+  { id: "market", th: "ต่อราคา", ko: "시장 흥정", who: "짜뚜짝 시장 상인", ai: "f",
+    role: "A vendor at Chatuchak weekend market selling T-shirts and souvenirs. Quote a price, let the learner bargain politely (ลดได้ไหม), concede a little but not too easily." },
+  { id: "way", th: "ถามทาง", ko: "길 묻기", who: "길 가던 사람", ai: "m",
+    role: "A passer-by near BTS Siam station. The learner asks for directions; give simple directions with ตรงไป, เลี้ยวซ้าย, เลี้ยวขวา, and landmarks." },
+  { id: "taxi", th: "นั่งแท็กซี่", ko: "택시", who: "방콕 택시 기사", ai: "m",
+    role: "A Bangkok taxi driver. Ask the destination; the learner should ask to use the meter (เปิดมิเตอร์), talk about the expressway (ขึ้นทางด่วน), traffic, and paying." },
+  { id: "hotel", th: "เช็คอินโรงแรม", ko: "호텔 체크인", who: "호텔 프런트 직원", ai: "f",
+    role: "Front desk staff at a hotel in Chiang Mai. Check-in, passport, number of nights, breakfast time, Wi-Fi password." },
+  { id: "shop", th: "ร้านสะดวกซื้อ", ko: "편의점", who: "세븐일레븐 점원", ai: "m",
+    role: "A cashier at a 7-Eleven. Ask if they want it heated (อุ่นไหม), a bag (รับถุงไหม), and how they will pay." },
+  { id: "free", th: "คุยอิสระ", ko: "자유 대화", who: "태국 친구", ai: "f",
+    role: "A friendly Thai friend chatting about anything the learner brings up. Keep it light and curious." },
+];
+const TONES = {
+  mid:     { ko: "평성",  path: "M2 6 L16 6" },
+  low:     { ko: "저성",  path: "M2 7 L16 10" },
+  falling: { ko: "하강조", path: "M2 3 Q8 0.5 16 10" },
+  high:    { ko: "고성",  path: "M2 5 Q10 5 16 1.5" },
+  rising:  { ko: "상승조", path: "M2 7 Q8 12 16 2" },
+};
+const LEVELS = {
+  beginner: { ko: "입문", prompt: "Absolute beginner: very short simple sentences (3-6 words), the most common words only, usually one sentence per reply." },
+  elementary: { ko: "초급", prompt: "Elementary: short everyday sentences, 1-2 per reply." },
+  intermediate: { ko: "중급", prompt: "Intermediate: natural colloquial Thai, 1-3 sentences per reply, common particles like นะ, เลย, จ้ะ are fine." },
+};
+const S = (th, pron, roman, ko, syl) => ({ th, pron, roman, ko, syl: syl.map(([t, r, tone]) => ({ th: t, r, t: tone })) });
+const EXAMPLE = [
+  { type: "ai", data: { reply: [S("สวัสดีค่ะ คุณชื่ออะไรคะ", "싸왓디 카, 쿤 츠 아라이 카", "sà-wàt-dii khâ, khun chʉ̂ʉ à-rai khá", "안녕하세요. 이름이 뭐예요?",
+      [["สะ","sà","low"],["วัส","wàt","low"],["ดี","dii","mid"],["ค่ะ","khâ","falling"],["คุณ","khun","mid"],["ชื่อ","chʉ̂ʉ","falling"],["อะ","à","low"],["ไร","rai","mid"],["คะ","khá","high"]])], hint: [], coach: "" } },
+  { type: "me", text: "저는 민수예요", feedback: { kind: "translate", you_meant: S("ผมชื่อมินซูครับ", "폼 츠 민쑤 크랍", "phǒm chʉ̂ʉ min-suu khráp", "제 이름은 민수예요.",
+      [["ผม","phǒm","rising"],["ชื่อ","chʉ̂ʉ","falling"],["มิน","min","mid"],["ซู","suu","mid"],["ครับ","khráp","high"]]),
+      note: "이름을 말할 때는 ชื่อ(이름)를 넣어요. 남성은 '나'를 ผม, 끝에 ครับ을 붙여요.", alt: [] } },
+  { type: "ai", data: { reply: [S("ยินดีที่ได้รู้จักค่ะ มาจากเกาหลีเหรอคะ", "인디 티 다이 루짝 카, 마 짝 까올리 러 카", "yin-dii thîi dâi rúu-jàk khâ, maa jàak kao-lǐi rə̌ə khá", "만나서 반가워요. 한국에서 왔어요?",
+      [["ยิน","yin","mid"],["ดี","dii","mid"],["ที่","thîi","falling"],["ได้","dâi","falling"],["รู้","rúu","high"],["จัก","jàk","low"],["ค่ะ","khâ","falling"],["มา","maa","mid"],["จาก","jàak","low"],["เกา","kao","mid"],["หลี","lǐi","rising"],["เหรอ","rə̌ə","rising"],["คะ","khá","high"]])],
+      hint: [], coach: "ค่ะ(카, 하강조)는 평서문, คะ(카, 고성)는 질문 끝에 써요. 소리는 비슷해도 성조가 달라요." } },
+];
+
+// ---------- helpers ----------
+const $ = (id) => document.getElementById(id);
+function el(tag, props, ...kids) {
+  const n = document.createElement(tag);
+  if (props) for (const [k, v] of Object.entries(props)) {
+    if (k.startsWith("aria-")) { n.setAttribute(k, String(v)); continue; }
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v;
+    else if (k === "text") n.textContent = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) n.append(c.nodeType ? c : String(c));
+  return n;
+}
+const SVGNS = "http://www.w3.org/2000/svg";
+function svg(viewBox, inner, w = "1.8") {
+  const s = document.createElementNS(SVGNS, "svg");
+  s.setAttribute("viewBox", viewBox); s.setAttribute("fill", "none"); s.setAttribute("stroke", "currentColor");
+  s.setAttribute("stroke-width", w); s.setAttribute("stroke-linecap", "round"); s.setAttribute("stroke-linejoin", "round"); s.setAttribute("aria-hidden", "true");
+  for (const d of inner) { const p = document.createElementNS(SVGNS, "path"); p.setAttribute("d", d); s.append(p); }
+  return s;
+}
+const toneSvg = (t) => svg("0 0 18 12", [TONES[t].path], "2");
+const icoPlay = () => svg("0 0 24 24", ["M11 5 6 9H3v6h3l5 4z", "M15.5 8.5a5 5 0 0 1 0 7", "M18.5 5.5a9 9 0 0 1 0 13"]);
+const icoStar = (on) => { const s = svg("0 0 24 24", ["M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"]); if (on) s.setAttribute("fill", "currentColor"); return s; };
+const icoTrash = () => svg("0 0 24 24", ["M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"]);
+function normTone(t) {
+  t = String(t || "").toLowerCase();
+  if (t.startsWith("fall") || t.includes("하강")) return "falling";
+  if (t.startsWith("ris") || t.includes("상승")) return "rising";
+  if (t.startsWith("hi") || t.includes("고")) return "high";
+  if (t.startsWith("lo") || t.includes("저")) return "low";
+  return "mid";
+}
+function cleanSent(s) {
+  if (!s || typeof s !== "object" || !s.th) return null;
+  return { th: String(s.th), pron: String(s.pron || ""), roman: String(s.roman || ""), ko: String(s.ko || ""),
+    syl: Array.isArray(s.syl) ? s.syl.filter(x => x && x.th).map(x => ({ th: String(x.th), r: String(x.r || ""), t: normTone(x.t) })) : [] };
+}
+const cleanList = (a) => (Array.isArray(a) ? a : []).map(cleanSent).filter(Boolean);
+function pid(th) { let h = 2166136261; for (const c of th) { h ^= c.codePointAt(0); h = Math.imul(h, 16777619); } return "p" + (h >>> 0).toString(36); }
+function lsGet(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+let toastTimer;
+function toast(msg) {
+  document.querySelector(".toast")?.remove();
+  const t = el("div", { class: "toast", role: "status", text: msg });
+  document.body.append(t); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 3200);
+}
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+// ---------- state ----------
+const settings = Object.assign({ gender: "m", level: "beginner", pron: "both", rate: 0.85, tones: true, micLang: "th", dir: "ko2th",
+  keepAwake: false, model: "", readKo: true, readFix: true, handsFree: true }, lsGet("thai.settings", {}));
+const saveSettings = () => lsSet("thai.settings", settings);
+let apiKey = lsGet("thai.gemini.key", "");
+let models = lsGet("thai.gemini.models", []);
+let conv = lsGet("thai.conv", null);
+const saveConv = () => lsSet("thai.conv", conv);
+let busy = false, lastError = null, pendingText = null, ctl = null;
+let view = "talk";
+
+// ---------- phrases (this browser) ----------
+const phrases = new Map(lsGet("thai.phrases", []).map(p => [p.id, p]));
+const savePhrases = () => lsSet("thai.phrases", [...phrases.values()]);
+function toggleSave(s, btn) {
+  const id = pid(s.th);
+  if (phrases.has(id)) { phrases.delete(id); toast("저장을 취소했어요"); }
+  else { phrases.set(id, { ...s, id, scenario: conv?.scenario || "", savedAt: Date.now(), box: 0, due: Date.now() }); toast("복습 목록에 저장했어요"); }
+  savePhrases(); refreshPhraseUI();
+}
+
+// ---------- speech out (browser voices, free) ----------
+let thVoice = null, koVoice = null;
+const canSpeak = "speechSynthesis" in window;
+function pickVoices() {
+  if (!canSpeak) return;
+  const vs = speechSynthesis.getVoices();
+  const best = (re) => { const c = vs.filter(v => re.test(v.lang)); return c.find(v => /google|premium|enhanced|natural|online/i.test(v.name)) || c[0] || null; };
+  thVoice = best(/^th([-_]|$)/i); koVoice = best(/^ko([-_]|$)/i);
+  if (view === "settings") renderSettings();
+}
+if (canSpeak) { pickVoices(); speechSynthesis.addEventListener?.("voiceschanged", pickVoices); }
+let speakToken = 0, speakingBtn = null;
+function stopSpeaking() { speakToken++; if (canSpeak) speechSynthesis.cancel(); speakingBtn?.classList.remove("speaking"); speakingBtn = null; }
+// speaks [{text, lang:"th"|"ko"}] one after another; resolves when finished or interrupted
+function speakSeq(lines, btn) {
+  stopSpeaking();
+  const my = speakToken;
+  if (!canSpeak) { toast("이 브라우저는 소리 읽기를 지원하지 않아요"); return Promise.resolve(); }
+  speakingBtn = btn || null; btn?.classList.add("speaking");
+  return (async () => {
+    for (const line of lines) {
+      if (my !== speakToken || !line.text) continue;
+      await new Promise(res => {
+        const u = new SpeechSynthesisUtterance(line.text);
+        const v = line.lang === "ko" ? koVoice : thVoice;
+        u.lang = v?.lang || (line.lang === "ko" ? "ko-KR" : "th-TH"); if (v) u.voice = v;
+        u.rate = line.lang === "ko" ? 1.05 : settings.rate;
+        const guard = setTimeout(res, 4000 + line.text.length * 250);
+        u.onend = u.onerror = () => { clearTimeout(guard); res(); };
+        speechSynthesis.speak(u);
+      });
+    }
+    if (my === speakToken) { btn?.classList.remove("speaking"); speakingBtn = null; }
+  })();
+}
+const speak = (text, btn) => { if (!thVoice) noThaiVoiceHint(); return speakSeq([{ text, lang: "th" }], btn); };
+let hinted = false;
+function noThaiVoiceHint() { if (hinted) return; hinted = true; toast("이 기기에 태국어 음성이 없어요. 설정 → '읽기 속도' 아래 안내를 봐 주세요"); }
+
+// ---------- speech in (browser recognition, free) ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, recMode = null, emptyTries = 0;
+function recLang(l) { return l === "ko" ? "ko-KR" : "th-TH"; }
+function startRec(mode) { // mode: "dictate" (fill the box) | "voice" (send when done)
+  if (!SR) return;
+  stopRec(); stopSpeaking();
+  const r = new SR(); rec = r; recMode = mode; r._auto = autoListening;
+  r.lang = recLang(settings.micLang); r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
+  let finalText = "";
+  r.onresult = (e) => {
+    if (r._aborted) return;
+    let interim = ""; finalText = "";
+    for (const r of e.results) { if (r.isFinal) finalText += r[0].transcript; else interim += r[0].transcript; }
+    const live = (finalText + interim).trim();
+    if (mode === "voice") setVoice("listening", live || "듣고 있어요…");
+    else { const p = $("partial"); p.textContent = live; p.hidden = !live; }
+  };
+  r.onerror = (e) => {
+    r._err = e.error;
+    if (r._aborted || e.error === "aborted" || e.error === "no-speech") return;
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      if (mode === "voice" && r._auto) handsFreeBlocked = true;
+      else micDenied();
+    } else if (e.error === "network") toast("음성 인식에는 인터넷 연결이 필요해요");
+    else if (e.error === "language-not-supported") toast(settings.micLang === "th" ? "이 브라우저는 태국어 음성 인식을 지원하지 않아요. 한국어로 바꿔 보세요" : "이 브라우저는 한국어 음성 인식을 지원하지 않아요");
+  };
+  r.onend = () => {
+    if (r._aborted || rec !== r) return; // replaced or cancelled: ignore
+    const me = r; rec = null; $("mic").classList.remove("live"); $("partial").hidden = true;
+    const text = finalText.trim();
+    if (mode === "dictate") { if (text) { const b = $("input"); b.value = (b.value ? b.value + " " : "") + text; autosize(); } return; }
+    if (!voiceOn) return;
+    if (text) { emptyTries = 0; voiceSend(text); return; }
+    if (me?._err === "not-allowed" || me?._err === "service-not-allowed") { setVoice("idle", handsFreeBlocked ? "이 기기는 자동으로 듣기를 막아요. 큰 버튼을 눌러 말하세요." : "마이크가 허용되지 않았어요."); return; }
+    emptyTries++;
+    if (settings.handsFree && emptyTries < 3 && !busy) { autoListen(); return; }
+    setVoice("idle", emptyTries >= 3 ? "말소리가 없어서 쉬고 있어요. 큰 버튼을 누르면 다시 들어요." : "");
+  };
+  try { r.start(); } catch { rec = null; if (mode === "voice") setVoice("idle", "마이크를 시작하지 못했어요. 큰 버튼을 다시 눌러 주세요."); return; }
+  if (mode === "dictate") $("mic").classList.add("live");
+  else setVoice("listening", "듣고 있어요…");
+}
+function stopRec() { if (rec) { const r = rec; r._aborted = true; rec = null; try { r.abort(); } catch {} } $("mic").classList.remove("live"); $("partial").hidden = true; }
+function micDenied() {
+  toast("마이크가 막혀 있어요. 주소창 왼쪽 자물쇠(또는 aA) → 마이크 '허용'으로 바꾼 뒤 다시 눌러 주세요");
+  if (voiceOn) setVoice("idle", "마이크 권한이 필요해요. 브라우저가 물으면 '허용'을 눌러 주세요.");
+}
+
+// ---------- voice conversation mode ----------
+let voiceOn = false, voiceState = "idle", autoListening = false, handsFreeBlocked = false;
+const STATE_TEXT = { idle: "눌러서 말하세요", listening: "듣고 있어요", thinking: "생각 중이에요", speaking: "말하는 중이에요" };
+function setVoice(state, sub) {
+  voiceState = state;
+  $("v-state").textContent = STATE_TEXT[state] + (state === "listening" ? ` · ${settings.micLang === "th" ? "태국어" : "한국어"}` : "");
+  if (sub !== undefined) $("v-sub").textContent = sub;
+  $("v-big").classList.toggle("listening", state === "listening");
+  $("v-big").setAttribute("aria-label", state === "listening" ? "그만 듣기" : state === "speaking" ? "읽기 멈추고 말하기" : "말하기");
+}
+function autoListen() {
+  if (!voiceOn || busy || handsFreeBlocked) { setVoice("idle"); return; }
+  autoListening = true; startRec("voice"); autoListening = false;
+}
+function renderVoiceOpts() {
+  const o = $("v-opts"); o.replaceChildren();
+  const chip = (label, key, after) => el("button", { class: "chip", "aria-pressed": !!settings[key], text: label,
+    onclick: () => { settings[key] = !settings[key]; saveSettings(); renderVoiceOpts(); after?.(); } });
+  o.append(
+    el("div", { class: "seg" },
+      el("button", { "aria-pressed": settings.micLang === "th", text: "태국어로 말하기", onclick: () => setMicLang("th") }),
+      el("button", { "aria-pressed": settings.micLang === "ko", text: "한국어로 말하기", onclick: () => setMicLang("ko") })),
+    chip("자동으로 이어 듣기", "handsFree"), chip("한국어 뜻도 읽기", "readKo"), chip("고친 문장 읽기", "readFix"),
+    el("button", { class: "v-off", text: "음성 대화 끄기", onclick: () => setVoiceOn(false) }));
+}
+function setMicLang(l) {
+  settings.micLang = l; saveSettings(); renderVoiceOpts(); updateMic();
+  if (rec && recMode === "voice") startRec("voice");
+}
+function setVoiceOn(on) {
+  voiceOn = on; $("voice").hidden = !on; updateMic();
+  $("voice-toggle").setAttribute("aria-pressed", String(on));
+  $("voice-toggle").style.background = on ? "var(--jade)" : ""; $("voice-toggle").style.color = on ? "var(--jade-ink)" : "";
+  if (!on) { stopRec(); stopSpeaking(); setVoice("idle", ""); return; }
+  handsFreeBlocked = false; emptyTries = 0;
+  if (canSpeak) { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); } // unlocks audio on iPhone
+  renderVoiceOpts();
+  if (!SR) { setVoice("idle", "이 브라우저는 음성 인식을 지원하지 않아요. 휴대폰 키보드의 마이크로 말해서 입력하고 '보내기'를 누르면 대답을 소리로 들려줘요."); }
+  else if (!conv) { setVoice("idle", "위에서 상황을 고르면 바로 대화가 시작돼요."); }
+  else { setVoice("idle", "큰 버튼을 누르고 말하세요. 처음에 마이크 권한을 물으면 '허용'을 눌러 주세요."); startRec("voice"); }
+}
+$("voice-toggle").onclick = () => setVoiceOn(!voiceOn);
+$("v-big").onclick = () => {
+  if (!SR) { toast("이 브라우저는 음성 인식이 안 돼요. 키보드의 마이크를 써 주세요"); return; }
+  if (!conv) { toast("먼저 상황을 골라 주세요"); return; }
+  if (voiceState === "listening") { stopRec(); setVoice("idle", ""); return; }
+  if (busy) return;
+  handsFreeBlocked = false; emptyTries = 0; startRec("voice");
+};
+async function voiceSend(text) { $("input").value = text; await send(); }
+function linesForTurn(item, meItem) {
+  const lines = [];
+  const f = meItem?.feedback;
+  if (settings.readFix && f?.you_meant && f.kind !== "good") {
+    if (settings.readKo) lines.push({ text: f.kind === "translate" ? "태국어로는 이렇게 말해요." : "이렇게 고쳐 말해요.", lang: "ko" });
+    lines.push({ text: f.you_meant.th, lang: "th" });
+  }
+  for (const s of item.data.reply) { lines.push({ text: s.th, lang: "th" }); if (settings.readKo && s.ko) lines.push({ text: s.ko, lang: "ko" }); }
+  return lines;
+}
+async function voiceAfterReply(meItem) {
+  if (!voiceOn || !conv) return;
+  const item = conv.items[conv.items.length - 1];
+  if (item?.type !== "ai") return;
+  setVoice("speaking", "다 들은 뒤 대답하세요. 큰 버튼을 누르면 바로 말할 수 있어요.");
+  await speakSeq(linesForTurn(item, meItem));
+  if (!voiceOn || voiceState !== "speaking") return;
+  if (settings.handsFree && SR) { emptyTries = 0; autoListen(); }
+  else setVoice("idle", "큰 버튼을 누르고 대답하세요.");
+}
+
+// ---------- sentence block ----------
+function sentenceBlock(s, opt = {}) {
+  const on = phrases.has(pid(s.th));
+  const star = el("button", { class: "mini" + (on ? " on" : ""), "aria-label": "복습 목록에 저장", title: "저장" }, icoStar(on));
+  star.dataset.pid = pid(s.th);
+  star.addEventListener("click", () => toggleSave(s, star));
+  const play = el("button", { class: "mini", "aria-label": "듣기", title: "듣기" }, icoPlay());
+  play.addEventListener("click", () => speak(s.th, play));
+  const parts = [el("div", { class: "th-row" }, el("div", { class: "th-text", lang: "th", text: s.th }), play, opt.noStar ? null : star)];
+  if (settings.tones && s.syl.length) {
+    parts.push(el("div", { class: "syls" }, s.syl.map(x => {
+      const b = el("button", { class: "syl t-" + x.t, title: TONES[x.t].ko + " · 눌러서 듣기" },
+        el("span", { class: "s-th", lang: "th", text: x.th }), el("span", { class: "s-r" }, x.r, toneSvg(x.t)));
+      b.addEventListener("click", () => speak(x.th));
+      return b;
+    })));
+  }
+  if (settings.pron !== "roman" && s.pron) parts.push(el("div", { class: "pron", text: s.pron }));
+  if (settings.pron !== "ko" && s.roman) parts.push(el("div", { class: "roman", text: s.roman }));
+  if (s.ko) parts.push(el("div", { class: "mean", text: s.ko }));
+  return el("div", { class: "sent" }, parts);
+}
+function legend() {
+  return el("div", { class: "legend" }, Object.entries(TONES).map(([k, v]) => el("span", { class: "t-" + k }, toneSvg(k), v.ko)));
+}
+
+// ---------- key setup ----------
+function keyBox(compact) {
+  const inp = el("input", { id: compact ? "key2" : "key1", type: "password", placeholder: "AIza로 시작하는 키를 붙여 넣기", autocomplete: "off", spellcheck: "false", value: apiKey });
+  const status = el("div", { class: apiKey ? "ok" : "help", text: apiKey ? `키 저장됨 · 모델: ${settings.model || "자동 선택"}` : "키는 이 기기 브라우저에만 저장되고, 구글 AI 서버로만 보내져요." });
+  const save = el("button", { class: "btn primary", text: "키 확인하고 저장" });
+  save.onclick = async () => {
+    const k = inp.value.trim();
+    if (!k) { status.className = "bad"; status.textContent = "키를 붙여 넣어 주세요."; return; }
+    save.disabled = true; status.className = "help"; status.textContent = "키를 확인하는 중…";
+    try {
+      const list = await listModels(k);
+      if (!list.length) throw { msg: "이 키로 쓸 수 있는 대화 모델을 찾지 못했어요." };
+      apiKey = k; lsSet("thai.gemini.key", k); models = list; lsSet("thai.gemini.models", list);
+      if (!list.includes(settings.model)) settings.model = defaultModel(list);
+      saveSettings();
+      status.className = "ok"; status.textContent = `키 확인 완료 · 모델: ${settings.model}`;
+      toast("키를 저장했어요. 이제 상황을 골라 대화해 보세요");
+      render(); if (view === "settings") renderSettings();
+    } catch (e) { status.className = "bad"; status.textContent = e?.msg || "키를 확인하지 못했어요."; }
+    finally { save.disabled = false; }
+  };
+  const show = el("button", { class: "btn", text: "보기", onclick: () => { inp.type = inp.type === "password" ? "text" : "password"; } });
+  return el("div", { class: "field" }, el("div", { class: "keyrow" }, inp, show, save), status);
+}
+function onboarding() {
+  return el("div", { class: "onboard" },
+    el("h2", { text: "처음 한 번만: 무료 AI 키 넣기" }),
+    el("ol", null,
+      el("li", null, "구글 계정으로 ", el("a", { href: "https://aistudio.google.com/app/apikey", target: "_blank", rel: "noopener", text: "Google AI Studio 키 페이지" }), "에 들어가요."),
+      el("li", { text: "'API 키 만들기(Create API key)'를 눌러요. 카드 등록 없이 무료예요." }),
+      el("li", { text: "만들어진 키(AIza…)를 복사해서 아래 칸에 붙여 넣고 저장해요." })),
+    keyBox(false),
+    el("div", { class: "help", text: "무료 사용량은 하루·분당 횟수 제한이 있어요. 한도에 걸리면 잠시 뒤 다시 쓰거나 설정에서 더 가벼운 모델(flash-lite)로 바꿔 주세요." }));
+}
+
+// ---------- Gemini (free tier) ----------
+const API = "https://generativelanguage.googleapis.com/v1beta";
+async function apiError(r) {
+  let j = null; try { j = await r.json(); } catch {}
+  const m = j?.error?.message || ""; const st = j?.error?.status || "";
+  if (r.status === 400 && /api key/i.test(m)) return { code: "key", msg: "키가 맞지 않아요. 키를 다시 복사해 붙여 넣어 주세요." };
+  if (r.status === 403) return { code: "key", msg: "이 키로는 쓸 수 없어요. AI Studio에서 새 키를 만들어 보세요." };
+  if (r.status === 429) return { code: "quota", msg: "무료 사용 한도에 걸렸어요. 1분쯤 뒤에 다시 보내거나, 설정에서 더 가벼운 모델(flash-lite)로 바꿔 보세요. 하루 한도라면 내일 다시 쓸 수 있어요." };
+  if (r.status === 404) return { code: "model", msg: "선택한 모델을 찾지 못했어요." };
+  if (r.status >= 500) return { code: "busy", msg: "구글 AI 서버가 바빠요. 잠시 뒤 다시 보내 주세요." };
+  return { code: st || "error", msg: "대답을 받지 못했어요. 다시 보내 주세요." };
+}
+async function listModels(key) {
+  let r;
+  try { r = await fetch(API + "/models?pageSize=200", { headers: { "x-goog-api-key": key } }); }
+  catch { throw { msg: "인터넷 연결을 확인해 주세요." }; }
+  if (!r.ok) throw await apiError(r);
+  const j = await r.json();
+  return (j.models || [])
+    .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
+    .map(m => String(m.name).replace(/^models\//, ""))
+    .filter(n => /^gemini/.test(n) && /flash/.test(n) && !/(image|tts|audio|live|embed|robotics|computer|thinking-exp)/.test(n));
+}
+function defaultModel(list) {
+  if (list.includes("gemini-flash-latest")) return "gemini-flash-latest";
+  const ver = (n) => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || "0");
+  const score = (n) => ver(n) * 100 - (/lite/.test(n) ? 30 : 0) - (/(preview|exp)/.test(n) ? 20 : 0) - (/-\d{3}$/.test(n) ? 1 : 0);
+  return [...list].sort((a, b) => score(b) - score(a))[0] || "gemini-flash-latest";
+}
+function parseJSON(text) {
+  const t = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+  try { return JSON.parse(t); } catch {}
+  const a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch {} }
+  throw { code: "json", msg: "대답을 읽지 못했어요. 다시 보내 주세요." };
+}
+async function gemini(system, turns, signal, retried) {
+  const contents = [];
+  for (const t of turns) {
+    const role = t.role === "assistant" ? "model" : "user";
+    const last = contents[contents.length - 1];
+    if (last && last.role === role) last.parts[0].text += "\n\n" + t.content;
+    else contents.push({ role, parts: [{ text: t.content }] });
+  }
+  const model = settings.model || defaultModel(models);
+  let r;
+  try {
+    r = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST", signal,
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents,
+        generationConfig: { responseMimeType: "application/json", temperature: 0.8 } }),
+    });
+  } catch (e) {
+    if (e?.name === "AbortError") throw { code: "cancelled" };
+    throw { code: "net", msg: "인터넷 연결을 확인하고 다시 보내 주세요." };
+  }
+  if (!r.ok) {
+    const err = await apiError(r);
+    if (err.code === "model" && !retried) {
+      try { models = await listModels(apiKey); lsSet("thai.gemini.models", models); settings.model = defaultModel(models); saveSettings(); return gemini(system, turns, signal, true); } catch {}
+    }
+    throw err;
+  }
+  const j = await r.json();
+  const parts = j.candidates?.[0]?.content?.parts || [];
+  const text = parts.filter(p => !p.thought).map(p => p.text || "").join("");
+  if (!text) throw { code: "blocked", msg: "이 내용으로는 대답을 받지 못했어요. 다르게 말해 보세요." };
+  return parseJSON(text);
+}
+
+// ---------- conversation ----------
+const scen = (id) => SCENARIOS.find(s => s.id === id);
+function rules(sc) {
+  const me = settings.gender === "m"
+    ? "male → whenever you write Thai for the learner to say, use ผม for 'I' and the particle ครับ"
+    : "female → whenever you write Thai for the learner to say, use ฉัน for 'I' and ค่ะ (statements) / คะ (questions)";
+  return `You are role-playing a Thai person in a speaking-practice app for a Korean learner of Thai.
+SCENE: ${sc.role}
+YOUR CHARACTER is ${sc.ai === "f" ? "female and uses ค่ะ/คะ (and ฉัน/ดิฉัน)" : "male and uses ครับ (and ผม)"}. Stay in character and in the scene.
+LEARNER: Korean, ${me}.
+LEVEL: ${LEVELS[settings.level].prompt}
+The learner may type or SPEAK (speech recognition can garble words: guess what they meant). Input may be Thai script, Korean, romanized Thai, or a mix. On every turn:
+1. "feedback" on the learner's latest message:
+   - mostly Korean → kind "translate"; you_meant = how to say it naturally in Thai.
+   - Thai/romanized with mistakes or unnatural phrasing → kind "fix"; you_meant = the corrected sentence; note = what changed and why, in Korean, 1-2 short sentences.
+   - correct Thai → kind "good"; you_meant = their sentence (cleaned up); note = short Korean praise or a tiny tip.
+   - alt = 0-2 other natural ways to say the same thing.
+   Then continue the scene as if the learner had said you_meant.
+2. "reply": 1-3 short sentences your character says, in Thai, ending with something that keeps the conversation going.
+3. "hint": 2-3 short sentences the learner could say next (in the learner's voice and particles).
+4. "coach": an optional one-line Korean tip (culture, grammar, a word) relevant to this turn, or "".
+Sentence object: {"th": Thai script, "pron": Hangul pronunciation, "roman": romanization with tone marks, "ko": natural Korean meaning, "syl": [{"th": one syllable in Thai script, "r": that syllable romanized, "t": "mid"|"low"|"falling"|"high"|"rising"}]}
+- "roman": Paiboon-style tone marks: mid no mark (dii), low grave (sà), falling circumflex (thîi), high acute (khráp), rising caron (sǎam); long vowels doubled; syllables of a word joined by hyphens, words separated by spaces.
+- "pron": Hangul that keeps aspiration distinct: ก=ㄲ, ข/ค=ㅋ, ต=ㄸ, ถ/ท=ㅌ, ป=ㅃ, ผ/พ=ㅍ, จ=ㅉ, ฉ/ช=ㅊ, ส/ซ=ㅆ; finals -k=ㄱ, -t=ㅅ, -p=ㅂ. Example: สวัสดีครับ → "싸왓디 크랍", คุณ → "쿤".
+- "syl" must cover every syllable of "th" in order. Work out each tone from consonant class, tone mark, live/dead syllable and vowel length. Tone accuracy matters more than anything else.
+Reply with ONLY one JSON object:
+{"feedback": {"kind": "...", "you_meant": Sentence, "note": "...", "alt": [Sentence]} or null, "reply": [Sentence], "hint": [Sentence], "coach": "..."}`;
+}
+const START = "Start the scene now with your first line(s) in character. There is no learner message yet, so \"feedback\" must be null.";
+async function ask(text) {
+  if (!apiKey) { lastError = "먼저 위에서 무료 AI 키를 넣어 주세요."; pendingText = text; render(); return false; }
+  busy = true; lastError = null; pendingText = text; if (voiceOn) setVoice("thinking", ""); render(); scrollEnd();
+  ctl = new AbortController();
+  const myConv = conv;
+  try {
+    const turns = [{ role: "user", content: START }, ...conv.turns.slice(-16)];
+    if (text != null) turns.push({ role: "user", content: `Learner's message: """${text}"""` });
+    const res = await gemini(rules(scen(conv.scenario)), turns, ctl.signal);
+    if (conv !== myConv) return true;
+    const reply = cleanList(res?.reply);
+    if (!reply.length) throw { code: "json", msg: "대답을 읽지 못했어요. 다시 보내 주세요." };
+    const fbRaw = res?.feedback;
+    const feedback = text != null && fbRaw && cleanSent(fbRaw.you_meant)
+      ? { kind: ["translate", "fix", "good"].includes(fbRaw.kind) ? fbRaw.kind : "fix", you_meant: cleanSent(fbRaw.you_meant), note: String(fbRaw.note || ""), alt: cleanList(fbRaw.alt).slice(0, 2) } : null;
+    let meItem = null;
+    if (text != null) {
+      meItem = conv.items[conv.items.length - 1];
+      if (meItem?.type === "me" && meItem.pending) { meItem.feedback = feedback; delete meItem.pending; }
+      conv.turns.push({ role: "user", content: text });
+    }
+    conv.items.push({ type: "ai", data: { reply, hint: cleanList(res?.hint).slice(0, 3), coach: String(res?.coach || "") } });
+    conv.turns.push({ role: "assistant", content: reply.map(s => s.th).join(" ") });
+    pendingText = null; saveConv();
+    busy = false; ctl = null; render(); scrollEnd();
+    voiceAfterReply(meItem);
+    return true;
+  } catch (e) {
+    if (e?.code === "cancelled") return false;
+    if (conv === myConv) {
+      lastError = e?.msg || "대답을 받지 못했어요. 다시 보내 주세요.";
+      if (voiceOn) setVoice("idle", lastError);
+    }
+    return false;
+  } finally {
+    if (conv === myConv && busy) { busy = false; ctl = null; render(); scrollEnd(); }
+  }
+}
+function startScene(id) {
+  if (ctl) ctl.abort();
+  stopRec(); stopSpeaking();
+  conv = { scenario: id, items: [], turns: [] }; saveConv(); busy = false; lastError = null;
+  render(); ask(null);
+}
+async function send() {
+  const box = $("input"); const text = box.value.trim();
+  if (!text || busy) return;
+  if (!conv) { toast("먼저 위에서 상황을 골라 주세요"); return; }
+  stopRec();
+  conv.items.push({ type: "me", text, pending: true, feedback: null });
+  box.value = ""; autosize(); saveConv();
+  await ask(text);
+}
+function retry() { if (!busy && conv) ask(pendingText ?? null); }
+
+// ---------- talk view ----------
+function renderTalk() {
+  const v = $("view-talk"); v.replaceChildren();
+  if (!apiKey) v.append(onboarding());
+  if (!conv) {
+    v.append(el("div", { class: "scen-head" }, el("h2", { text: "어떤 상황을 연습할까요?" })));
+    v.append(el("div", { class: "scen-grid" }, SCENARIOS.map(s => el("button", { class: "scen", onclick: () => startScene(s.id) },
+      el("span", { class: "th", lang: "th", text: s.th }), el("span", { class: "ko", text: s.ko })))));
+    v.append(legend());
+    v.append(el("div", { class: "example-cap" }, el("span", { class: "tag", text: "예시" }), "이런 식으로 대화가 진행돼요. 한국어로 말해도 태국어로 바꿔 알려 줘요."));
+    v.append(chatList(EXAMPLE, "카페에서 만난 태국 친구"));
+  } else {
+    const sc = scen(conv.scenario);
+    v.append(el("div", { class: "scene-bar" },
+      el("div", { class: "txt" }, el("div", { class: "t1" }, el("span", { lang: "th", text: sc.th }), sc.ko),
+        el("div", { class: "t2", text: "상대: " + sc.who + " · " + LEVELS[settings.level].ko })),
+      el("button", { class: "btn", text: "상황 바꾸기", onclick: () => { if (ctl) ctl.abort(); stopRec(); stopSpeaking(); conv = null; saveConv(); lastError = null; busy = false; if (voiceOn) setVoice("idle", "위에서 상황을 고르면 바로 대화가 시작돼요."); render(); } })));
+    const list = chatList(conv.items, sc.who);
+    v.append(list);
+    if (busy) list.append(el("div", { class: "msg" }, el("div", { class: "who", text: sc.who }), el("div", { class: "ai-card" }, el("span", { class: "typing" }, el("i"), el("i"), el("i"), "생각 중"))));
+    if (lastError) list.append(el("div", { class: "err" }, lastError, el("button", { class: "btn", text: "다시 보내기", onclick: retry })));
+  }
+  renderHints();
+}
+function chatList(items, who) {
+  const list = el("div", { class: "chat" });
+  for (const it of items) {
+    if (it.type === "ai") {
+      const card = el("div", { class: "ai-card" }, it.data.reply.map(s => sentenceBlock(s)));
+      if (it.data.coach) card.append(el("div", { class: "coach" }, el("b", { text: "팁 " }), it.data.coach));
+      list.append(el("div", { class: "msg" }, el("div", { class: "who", text: who }), card));
+    } else {
+      const m = el("div", { class: "msg me" }, el("div", { class: "me-bubble", text: it.text }));
+      const f = it.feedback;
+      if (f && f.you_meant) {
+        const title = f.kind === "translate" ? "태국어로는 이렇게 말해요" : f.kind === "fix" ? "이렇게 고치면 더 자연스러워요" : "잘 말했어요";
+        const fb = el("div", { class: "fb" }, el("div", { class: "fb-title", text: title }), sentenceBlock(f.you_meant));
+        if (f.note) fb.append(el("div", { class: "fb-note", text: f.note }));
+        if (f.alt?.length) fb.append(el("div", { class: "fb-alt-title", text: "이렇게도 말할 수 있어요" }), ...f.alt.map(s => sentenceBlock(s)));
+        m.append(fb);
+      }
+      list.append(m);
+    }
+  }
+  return list;
+}
+function renderHints() {
+  const h = $("hints"); h.replaceChildren();
+  const last = conv && !busy ? [...conv.items].reverse().find(i => i.type === "ai") : null;
+  const hints = last?.data.hint || [];
+  h.hidden = view !== "talk" || !hints.length;
+  if (!hints.length) return;
+  h.append(el("span", { class: "hints-label", text: "이렇게 말해 볼까요" }));
+  for (const s of hints) h.append(el("button", { class: "hint", onclick: () => { $("input").value = s.th; autosize(); speak(s.th); } },
+    el("span", { class: "h-th", lang: "th", text: s.th }), el("span", { class: "h-ko", text: (settings.pron === "roman" ? s.roman : s.pron) + " · " + s.ko })));
+}
+
+// ---------- review view ----------
+const INTERVALS = [0, 1, 2, 4, 7, 15, 30];
+let queue = null, qIndex = 0, revealed = false, delArm = null;
+const dueList = () => [...phrases.values()].filter(p => (p.due || 0) <= Date.now()).sort((a, b) => (a.due || 0) - (b.due || 0));
+function refreshPhraseUI() {
+  const n = dueList().length, b = $("due-badge"); b.textContent = n; b.hidden = !n;
+  if (view === "review") renderReview();
+  document.querySelectorAll(".mini[data-pid]").forEach(btn => { const on = phrases.has(btn.dataset.pid); btn.classList.toggle("on", on); btn.replaceChildren(icoStar(on)); });
+}
+function grade(p, ok) {
+  const box = ok ? Math.min((p.box || 0) + 1, INTERVALS.length - 1) : 0;
+  phrases.set(p.id, { ...p, box, due: ok ? Date.now() + INTERVALS[box] * 864e5 - 36e5 : Date.now() }); savePhrases();
+  if (!ok) queue.push(p);
+  qIndex++; revealed = false; refreshPhraseUI();
+}
+function renderReview() {
+  const v = $("view-review"); v.replaceChildren();
+  const all = [...phrases.values()].sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+  const due = dueList();
+  v.append(el("div", { class: "stats" },
+    el("div", { class: "stat" }, el("b", { text: all.length }), el("span", { text: "저장한 표현" })),
+    el("div", { class: "stat" }, el("b", { text: due.length }), el("span", { text: "오늘 복습" })),
+    el("div", { class: "stat" }, el("b", { text: all.filter(p => (p.box || 0) >= 3).length }), el("span", { text: "익힌 표현" }))));
+  if (queue && qIndex < queue.length) {
+    const p = queue[qIndex], s = cleanSent(p);
+    const card = el("div", { class: "card" });
+    if (!revealed) {
+      card.append(el("div", { class: "qmeta", text: `${qIndex + 1} / ${queue.length} · ${settings.dir === "ko2th" ? "태국어로 말해 보세요" : "무슨 뜻일까요?"}` }),
+        settings.dir === "ko2th" ? el("div", { class: "front-ko", text: s.ko || "(뜻 없음)" }) : el("div", { class: "front-th", lang: "th", text: s.th }));
+      if (settings.dir === "th2ko") { const pb = el("button", { class: "btn", text: "듣기" }); pb.onclick = () => speak(s.th, pb); card.append(pb); }
+      card.append(el("button", { class: "btn primary", text: "정답 보기", onclick: () => { revealed = true; renderReview(); speak(s.th); } }));
+    } else {
+      card.append(el("div", { class: "qmeta", text: `${qIndex + 1} / ${queue.length}` }), sentenceBlock(s, { noStar: true }),
+        el("div", { class: "card-actions" },
+          el("button", { class: "btn", text: "다시 볼래요", onclick: () => grade(p, false) }),
+          el("button", { class: "btn primary", text: "기억났어요", onclick: () => grade(p, true) })));
+    }
+    v.append(card, el("button", { class: "btn", text: "복습 그만하기", onclick: () => { queue = null; renderReview(); } }));
+    return;
+  }
+  if (queue) { v.append(el("div", { class: "empty", text: "오늘 복습을 다 했어요. 수고했어요!" })); queue = null; }
+  if (all.length) {
+    v.append(el("div", { class: "scen-head" }, el("h2", { text: "카드 복습" }),
+      el("div", { class: "seg" },
+        el("button", { "aria-pressed": settings.dir === "ko2th", text: "한국어 → 태국어", onclick: () => { settings.dir = "ko2th"; saveSettings(); renderReview(); } }),
+        el("button", { "aria-pressed": settings.dir === "th2ko", text: "태국어 → 한국어", onclick: () => { settings.dir = "th2ko"; saveSettings(); renderReview(); } }))));
+    v.append(el("div", { class: "card-actions", style: "justify-content:flex-start" },
+      el("button", { class: "btn primary", text: due.length ? `복습 시작 (${due.length}개)` : "복습할 표현이 없어요", disabled: !due.length || null, onclick: () => { queue = dueList(); qIndex = 0; revealed = false; renderReview(); } }),
+      el("button", { class: "btn", text: "전체 섞어서 복습", onclick: () => { queue = [...all].sort(() => Math.random() - 0.5); qIndex = 0; revealed = false; renderReview(); } })));
+  }
+  v.append(el("h2", { text: "저장한 표현" }));
+  if (!all.length) { v.append(el("div", { class: "empty", text: "대화 중 문장 옆의 별을 누르면 여기에 모여요." })); return; }
+  const search = el("input", { id: "search", type: "search", placeholder: "태국어, 발음, 뜻으로 찾기", value: v.dataset.q || "" });
+  const list = el("div", { class: "list" });
+  const draw = () => {
+    const q = search.value.trim().toLowerCase(); list.replaceChildren();
+    for (const p of all) {
+      if (q && ![p.th, p.pron, p.roman, p.ko].some(x => String(x || "").toLowerCase().includes(q))) continue;
+      const play = el("button", { class: "mini", "aria-label": "듣기" }, icoPlay()); play.onclick = () => speak(p.th, play);
+      const del = el("button", { class: "mini del" + (delArm === p.id ? " confirm" : ""), "aria-label": "삭제" }, delArm === p.id ? "삭제" : icoTrash());
+      del.onclick = () => { if (delArm === p.id) { delArm = null; phrases.delete(p.id); savePhrases(); refreshPhraseUI(); } else { delArm = p.id; draw(); } };
+      list.append(el("div", { class: "item" }, el("div", { class: "body" }, el("div", { class: "i-th", lang: "th", text: p.th }),
+        el("div", { class: "i-sub", text: [settings.pron === "roman" ? p.roman : p.pron, p.ko].filter(Boolean).join(" · ") })), el("div", { class: "i-acts" }, play, del)));
+    }
+    if (!list.children.length) list.append(el("div", { class: "empty", text: "찾는 표현이 없어요." }));
+  };
+  search.addEventListener("input", () => { v.dataset.q = search.value; draw(); });
+  v.append(search, list); draw();
+}
+
+// ---------- settings ----------
+function seg(key, options, after) {
+  return el("div", { class: "seg" }, options.map(([val, label]) => el("button", { "aria-pressed": settings[key] === val, text: label,
+    onclick: () => { settings[key] = val; saveSettings(); after?.(); renderSettings(); } })));
+}
+function renderSettings() {
+  const v = $("view-settings"); v.replaceChildren();
+  const voiceNote = thVoice ? `태국어 음성: ${thVoice.name}` : "이 기기에서 태국어 음성을 찾지 못했어요. Windows는 설정 → 시간 및 언어 → 음성 → 음성 추가에서 '태국어'를 설치한 뒤 브라우저를 다시 열어 주세요. 안드로이드는 설정 → 'Google 음성 서비스' → 음성 데이터에서 태국어를 받을 수 있어요. 아이폰은 설정 → 손쉬운 사용 → 읽기 및 말하기 → 음성 → 태국어.";
+  const rate = el("input", { type: "range", id: "rate", min: "0.5", max: "1.2", step: "0.05", value: settings.rate });
+  const rateVal = el("span", { text: " " + Number(settings.rate).toFixed(2) + "배" });
+  rate.addEventListener("input", () => { settings.rate = Number(rate.value); rateVal.textContent = " " + settings.rate.toFixed(2) + "배"; saveSettings(); });
+  const modelSel = el("select", { id: "model" }, (models.length ? models : [settings.model || "gemini-flash-latest"]).map(m => el("option", { value: m, text: m + (/lite/.test(m) ? " (가볍고 빠름)" : "") })));
+  modelSel.value = settings.model || defaultModel(models);
+  modelSel.onchange = () => { settings.model = modelSel.value; saveSettings(); toast("모델을 바꿨어요"); };
+  v.append(el("div", { class: "scen-head" }, el("h2", { text: "설정" }), el("button", { class: "btn", text: "닫기", onclick: () => setView("talk") })),
+    el("div", { class: "settings" },
+      el("div", { class: "field" }, el("div", { class: "lbl", text: "무료 AI 키 (Google Gemini)" }), keyBox(true),
+        el("div", { class: "help" }, "키는 ", el("a", { href: "https://aistudio.google.com/app/apikey", target: "_blank", rel: "noopener", text: "Google AI Studio" }), "에서 무료로 만들 수 있어요. 이 기기에만 저장돼요. 다른 기기에서는 그 기기에서 한 번 더 넣어 주세요.")),
+      el("div", { class: "field" }, el("label", { for: "model", text: "AI 모델" }), modelSel,
+        el("div", { class: "help", text: "한도에 자주 걸리면 'lite'가 붙은 모델로 바꿔 보세요. 대신 성조·교정이 조금 덜 정확할 수 있어요." })),
+      el("div", { class: "field" }, el("div", { class: "lbl", text: "나는" }), seg("gender", [["m", "남성 · ผม / ครับ"], ["f", "여성 · ฉัน / ค่ะ"]]),
+        el("div", { class: "help", text: "태국어는 말하는 사람의 성별에 따라 문장 끝 말이 달라요." })),
+      el("div", { class: "field" }, el("div", { class: "lbl", text: "난이도" }), seg("level", Object.entries(LEVELS).map(([k, x]) => [k, x.ko]))),
+      el("div", { class: "field" }, el("div", { class: "lbl", text: "발음 표기" }), seg("pron", [["both", "한글 + 로마자"], ["ko", "한글만"], ["roman", "로마자만"]])),
+      el("div", { class: "field" }, el("div", { class: "lbl", text: "음절별 성조 표시" }), seg("tones", [[true, "보이기"], [false, "숨기기"]]), legend()),
+      el("div", { class: "field" }, el("label", { for: "rate", text: "태국어 읽기 속도" }), el("div", null, rate, rateVal),
+        el("div", { class: "help", text: voiceNote }),
+        el("div", null, el("button", { class: "btn", text: "들어 보기", onclick: (e) => speak("สวัสดีครับ ยินดีที่ได้รู้จัก", e.currentTarget) }))),
+      el("div", { class: "field" }, el("div", { class: "lbl", text: "음성 대화" }),
+        el("div", { class: "help", text: SR
+          ? "아래쪽 '음성 대화'를 누르면 말로 주고받아요. 처음에 마이크 권한을 물으면 꼭 '허용'을 눌러 주세요. 거절했다면 주소창 왼쪽 자물쇠(아이폰은 aA) → 마이크 → 허용으로 바꿔요. 음성 인식은 인터넷이 연결돼 있어야 해요."
+          : "이 브라우저는 음성 인식을 지원하지 않아요(예: 파이어폭스, 일부 앱 안 브라우저). 크롬·엣지·사파리로 열거나, 키보드의 마이크 버튼으로 말해서 입력하세요. 대답 읽어 주기는 그대로 돼요." })),
+      el("div", { class: "field" }, el("div", { class: "lbl", text: "화면 켜두기" }),
+        canWake ? seg("keepAwake", [[true, "켜기"], [false, "끄기"]], applyWake) : null,
+        el("div", { class: "help", text: canWake
+          ? "켜 두면 이 페이지를 보는 동안 화면이 꺼지지 않아요. 내가 '끄기'나 위쪽 전구 버튼을 누를 때만 꺼져요. 다른 앱으로 가면 잠깐 풀렸다가, 돌아오면 다시 켜져요."
+          : "이 브라우저에서는 화면 켜두기를 쓸 수 없어요. 휴대폰 설정에서 화면 꺼짐 시간을 늘려 주세요." })),
+      el("div", { class: "field" }, el("div", { class: "lbl", text: "저장 위치" }),
+        el("div", { class: "help", text: "대화와 저장한 표현은 이 기기 브라우저에 저장돼요. 브라우저 기록(사이트 데이터)을 지우면 함께 지워져요." }))));
+}
+
+// ---------- mic (dictation into the box) ----------
+function updateMic() { $("mic").hidden = !SR || view !== "talk" || voiceOn; $("mic-lang").textContent = settings.micLang === "th" ? "TH" : "KO"; }
+$("mic").addEventListener("click", () => { if (rec) { rec.stop(); return; } startRec("dictate"); });
+$("mic").addEventListener("contextmenu", (e) => { e.preventDefault(); setMicLang(settings.micLang === "th" ? "ko" : "th"); toast(settings.micLang === "th" ? "태국어로 들어요" : "한국어로 들어요"); });
+$("mic-lang").addEventListener("click", (e) => { e.stopPropagation(); setMicLang(settings.micLang === "th" ? "ko" : "th"); toast(settings.micLang === "th" ? "태국어로 들어요" : "한국어로 들어요"); });
+
+// ---------- keep screen on ----------
+let wakeLock = null;
+const canWake = "wakeLock" in navigator;
+async function applyWake(fromUser = true) {
+  if (canWake && settings.keepAwake && document.visibilityState === "visible" && !wakeLock) {
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; updateAwakeBtn(); });
+      if (fromUser) toast("화면이 꺼지지 않게 켜 뒀어요. 끄려면 전구 버튼을 다시 누르세요");
+    } catch { if (fromUser) toast("이 화면에서는 '화면 켜두기'를 쓸 수 없어요"); }
+  }
+  if (!settings.keepAwake && wakeLock) { const w = wakeLock; wakeLock = null; w.release().catch(() => {}); if (fromUser) toast("화면 켜두기를 껐어요"); }
+  updateAwakeBtn();
+}
+function updateAwakeBtn() {
+  const b = $("btn-awake"); b.hidden = !canWake;
+  b.setAttribute("aria-pressed", String(!!settings.keepAwake));
+  b.title = settings.keepAwake ? "화면 켜두기 켜짐 · 누르면 꺼요" : "화면 켜두기";
+}
+$("btn-awake").onclick = () => { settings.keepAwake = !settings.keepAwake; saveSettings(); applyWake(); if (view === "settings") renderSettings(); };
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") applyWake(false); });
+
+// ---------- shell ----------
+function setView(v) {
+  view = v;
+  $("view-talk").hidden = v !== "talk"; $("view-review").hidden = v !== "review"; $("view-settings").hidden = v !== "settings";
+  $("tab-talk").setAttribute("aria-selected", String(v === "talk")); $("tab-review").setAttribute("aria-selected", String(v === "review"));
+  $("composer").hidden = v !== "talk";
+  if (v === "review") { queue = null; renderReview(); }
+  if (v === "settings") renderSettings();
+  render(); $("main").scrollTop = 0;
+}
+function render() { if (view === "talk") renderTalk(); $("send").disabled = busy; updateMic(); renderHints(); }
+function scrollEnd() { const m = $("main"); requestAnimationFrame(() => { m.scrollTop = m.scrollHeight; }); }
+function autosize() { const b = $("input"); b.style.height = "auto"; b.style.height = Math.min(b.scrollHeight, 140) + "px"; }
+$("tab-talk").onclick = () => setView("talk");
+$("tab-review").onclick = () => setView("review");
+$("btn-settings").onclick = () => setView(view === "settings" ? "talk" : "settings");
+$("send").onclick = send;
+$("input").addEventListener("input", autosize);
+$("input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229 && matchMedia("(hover: hover)").matches) { e.preventDefault(); send(); }
+});
+
+if (conv && !scen(conv.scenario)) conv = null;
+if (conv) {
+  const last = conv.items[conv.items.length - 1];
+  if (last?.type === "me" && last.pending) { pendingText = last.text; lastError = "대답을 받기 전에 화면이 닫혔어요. 다시 보내 주세요."; }
+  else if (!conv.items.length) lastError = "대화를 시작하지 못했어요. 다시 시도해 주세요.";
+}
+render(); if (conv) scrollEnd();
+refreshPhraseUI(); applyWake(false);
+})();
+</script>
+</body>
+</html>
