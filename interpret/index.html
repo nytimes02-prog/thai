@@ -280,8 +280,8 @@ Examples of the quality expected:
 - Thai "หมดแล้วค่ะ" → Korean "다 떨어졌어요."${mine}
 For each input (an audio clip or a typed text):
 1. Decide the language: "ko" (Korean) or "th" (Thai). If the audio is silence, noise, unclear, or another language, return lang "none" and leave the other fields empty.
-   The phone is in a room that may have a TV, radio, video or other people talking in the background. Interpret only a person speaking close to the phone, addressing the other person.
-   If the clip is mainly background media or distant voices (TV-like sound: music, announcer or drama voices, laughter tracks, ads, far-away chatter), return lang "none".${settings.sens === "near" ? " Be strict: when unsure whether the voice is close to the phone, return \"none\"." : ""}
+   The two people may sit a little apart, so the other person's voice can be quieter or less clear than the user's: still interpret it, and do your best with Thai spoken fast or casually.
+   Return "none" only when the clip is clearly TV, radio or video sound (music, an announcer, drama voices, laughter tracks, ads) or only noise.${settings.sens === "near" ? " The user chose 'near voices only': also return \"none\" for voices that are clearly far away." : ""}
 2. heard: exactly what was said, in its own script (Hangul for Korean, Thai script for Thai). Do not translate here.
 3. translation: what a native speaker would naturally say in the other language.
    Korean → Thai: polite everyday spoken Thai; end with the right polite particle for the user's gender where natural.
@@ -442,9 +442,12 @@ async function translateClip(chunks, hint) {
   const ask = contextText() + (hint ? `The speaker pressed the ${hint === "ko" ? "Korean" : "Thai"} button, so this is most likely ${hint === "ko" ? "Korean" : "Thai"}.\n` : "") + "Interpret this audio.";
   await runTranslate([{ inlineData: { mimeType: "audio/wav", data } }, { text: ask }], hint);
 }
-async function translateText(text) {
-  const hint = isThai(text) ? "th" : "ko";
-  await runTranslate([{ text: contextText() + `Typed text (${hint === "ko" ? "Korean" : "Thai"}):\n${text}` }], hint, text);
+// spoken = the words came from the phone's own speech recognition (they can contain small mistakes)
+async function translateText(text, spoken) {
+  const hint = spoken || (isThai(text) ? "th" : "ko"), name = hint === "ko" ? "Korean" : "Thai";
+  const ask = spoken ? `${name} speech, written down by the phone's speech recognition (it may contain small recognition mistakes or missing punctuation — interpret the most likely meaning; put the corrected sentence in "heard"):\n${text}`
+    : `Typed text (${name}):\n${text}`;
+  await runTranslate([{ text: contextText() + ask }], hint, text, spoken);
 }
 // the Hangul reading sometimes carries a stray Thai letter or two: drop those; if it is mostly not Hangul, drop the reading
 function cleanHangul(s) {
@@ -452,16 +455,16 @@ function cleanHangul(s) {
   const hangul = (t.match(/[가-힣]/g) || []).length, latin = (t.match(/[a-z]/gi) || []).length;
   return hangul && latin < hangul / 4 ? t : "";
 }
-async function runTranslate(parts, hint, typed) {
+async function runTranslate(parts, hint, typed, spoken) {
   if (!apiKey) { showSetup(true); toast("먼저 무료 AI 키를 넣어 주세요"); return; }
   busy = true; setStatus("<b>통역하는 중…</b>");
-  const pending = el("div", { class: "card pending" }, el("div", { class: "dir", text: typed ? "글로 쓴 말" : "알아듣는 중…" }), el("div", { class: "out", text: typed || "잠깐만요…" }));
+  const pending = el("div", { class: "card pending" }, el("div", { class: "dir", text: spoken ? "들은 말 · 통역하는 중…" : typed ? "글로 쓴 말" : "알아듣는 중…" }), el("div", { class: "out", lang: hint, text: typed || "잠깐만요…" }));
   $("list").append(pending); scrollDown();
   try {
     const r = await gemini(systemPrompt(), parts);
     pending.remove();
     const lang = r.lang === "th" || r.lang === "ko" ? r.lang : (typed ? hint : "none");
-    if (lang === "none" || !String(r.translation || "").trim()) { setStatus("말소리를 알아듣지 못했어요. 다시 말해 주세요."); return; }
+    if (lang === "none" || !String(r.translation || "").trim()) { setStatus(running ? "말소리를 알아듣지 못했어요. 태국어는 '눌러서 말하기' → 'พูดภาษาไทย'로 하면 더 잘 알아들어요." : "말소리를 알아듣지 못했어요. 다시 말해 주세요."); return; }
     const item = { id: Date.now(), lang, heard: String(r.heard || typed || ""), translation: String(r.translation), th_roman: String(r.th_roman || ""), th_hangul: cleanHangul(r.th_hangul), note: String(r.note || "") };
     log.push(item); saveLog(); $("list").append(card(item)); scrollDown();
     busy = false;
@@ -556,10 +559,49 @@ function stopAuto(msg) {
 $("go").onclick = () => (running ? stopAuto() : startAuto());
 $("calBtn").onclick = startCalib;
 
+// ---------- 눌러서 말하기 with the phone's own speech recognition ----------
+// 11/19 (user: Thai was misheard or ignored): the phone's recogniser (Google on Android Chrome, Apple on iPhone Safari) hears Thai
+// much better than the AI does from a raw clip, and it knows which language to expect because a button was pressed.
+// The recognised words then go to the AI as text. Where the browser has no recogniser, the recorded-clip path below is used.
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let srRec = null, srBroken = false;
+function stopMicStream() { if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } micReady = false; }   // the recogniser wants the mic for itself
+function startSR(lang) {
+  const r = new SR(); srRec = r;
+  r.lang = lang === "th" ? "th-TH" : "ko-KR"; r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
+  let final = "", heardAny = false;
+  r.onresult = (e) => {
+    let interim = ""; final = "";
+    for (const x of e.results) { if (x.isFinal) final += x[0].transcript; else interim += x[0].transcript; }
+    heardAny = true;
+    setStatus(`<b>${lang === "th" ? "ฟังอยู่…" : "듣는 중…"}</b> <span lang="${lang}">${(final + interim).replace(/[<&]/g, "")}</span>`);
+  };
+  r.onerror = (e) => {
+    r._err = e.error;
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") { srBroken = true; }   // fall back to recording clips next time
+    else if (e.error === "network") toast("음성 인식에는 인터넷이 필요해요");
+    else if (e.error === "language-not-supported") { srBroken = true; toast("이 휴대폰은 이 언어 음성 인식이 없어요. 녹음 방식으로 바꿀게요"); }
+  };
+  r.onend = () => {
+    if (srRec !== r) return;
+    srRec = null; disarm(true);
+    const text = final.trim();
+    if (text) { translateText(text, lang); return; }
+    if (srBroken && r._err) { setStatus("휴대폰 음성 인식을 쓸 수 없어서 녹음 방식으로 바꿨어요. 버튼을 다시 눌러 주세요"); return; }
+    setStatus(heardAny ? "말이 끝나기 전에 끊겼어요. 다시 눌러 주세요" : (lang === "th" ? "ไม่ได้ยินเสียง · 말소리가 없었어요. 버튼을 누르고 바로 말해 주세요" : "말소리가 없었어요. 버튼을 누르고 바로 말해 주세요"));
+  };
+  try { r.start(); } catch { srRec = null; disarm(true); srBroken = true; setStatus("음성 인식을 시작하지 못했어요. 다시 눌러 주세요"); return; }
+  manualLang = lang;
+  $("sayKo").classList.toggle("live", lang === "ko"); $("sayTh").classList.toggle("live", lang === "th");
+  setStatus(lang === "th" ? "<b lang='th'>พูดได้เลยครับ/ค่ะ</b> · 태국어로 말하세요" : "<b>한국어로 말하세요</b>");
+}
 async function arm(lang) {
   if (!apiKey) { showSetup(true); toast("먼저 무료 AI 키를 넣어 주세요"); return; }
+  if (srRec) { const r = srRec; if (manualLang === lang) { r.stop(); return; } srRec = null; try { r.abort(); } catch {} disarm(true); }   // same button again = done talking
   if (manualLang === lang) { disarm(); setStatus("취소했어요"); return; }
+  if (busy) { toast("앞의 말을 통역하는 중이에요. 잠깐만 기다려 주세요"); return; }
   unlockSpeech(); stopSpeaking();
+  if (SR && !srBroken) { stopAuto(); stopMicStream(); startSR(lang); return; }
   if (!(await ensureMic())) return;
   manualLang = lang; armedAt = performance.now(); rec = null; pre = []; loud = 0;
   $("sayKo").classList.toggle("live", lang === "ko"); $("sayTh").classList.toggle("live", lang === "th");
