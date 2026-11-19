@@ -62,6 +62,12 @@ main { flex: 1; overflow-y: auto; }
 .card .acts { display: flex; gap: 6px; margin-top: 8px; }
 .chip { border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 3px 12px; font-size: 13px; }
 .card.pending .out { color: var(--muted); font-size: 16px; font-weight: 500; }
+.card .mine { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--jade); background: var(--jade-soft); border-radius: 999px; padding: 0 8px; }
+.fixbox { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.fixbox textarea { width: 100%; border: 1px solid var(--jade); background: var(--bg); border-radius: 10px; padding: 8px 10px; font-size: 18px; resize: vertical; }
+.dict { display: flex; flex-direction: column; gap: 6px; }
+.dict div { display: flex; gap: 8px; align-items: center; font-size: 14px; border-top: 1px solid var(--line); padding-top: 6px; }
+.dict span { flex: 1; overflow-wrap: anywhere; }
 .dock { flex: none; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
 .status { display: flex; align-items: center; gap: 10px; padding-top: 10px; min-height: 34px; }
 .status .txt { flex: 1; font-size: 14px; }
@@ -152,10 +158,14 @@ const isThai = (s) => /[฀-๿]/.test(s);
 // the Gemini key and model list are shared with the free conversation page (same keys in this browser)
 let apiKey = lsGet("thai.gemini.key", "");
 let models = lsGet("thai.gemini.models", []);
-const settings = Object.assign({ model: "", gender: "m", sens: "mid", silence: 900, rate: 0.9, mode: "auto", showReading: true }, lsGet("interp.settings", {}));
+// model "" = automatic; prefer "quality" = try a stronger model first, "speed" = lite model only; scene = where the talk happens
+const settings = Object.assign({ model: "", prefer: "quality", scene: "auto", gender: "m", sens: "mid", silence: 900, rate: 0.9, mode: "auto", showReading: true }, lsGet("interp.settings", {}));
 const saveSettings = () => lsSet("interp.settings", settings);
-if (settings.modelPick !== 2) { settings.model = ""; settings.modelPick = 2; saveSettings(); }   // 11/19: drop the old default (gemini-flash-latest hung); the fast lite model is chosen below
+if (settings.modelPick !== 3) { settings.model = ""; settings.modelPick = 3; saveSettings(); }   // 11/19: back to automatic choice (older versions pinned the last model that answered)
 let log = lsGet("interp.log", []);
+// 내 표현 사전: translations the user corrected; sent with every request so the same sentence comes out the corrected way
+let dict = lsGet("interp.dict", []);
+const saveDict = () => { dict = dict.slice(-60); lsSet("interp.dict", dict); };
 const saveLog = () => { log = log.slice(-80); lsSet("interp.log", log); };
 
 // ---------- Gemini (free tier) ----------
@@ -180,13 +190,17 @@ async function listModels(key) {
     .map(m => String(m.name).replace(/^models\//, ""))
     .filter(n => /^gemini/.test(n) && /flash/.test(n) && !/(image|tts|audio|live|embed|robotics|computer|thinking-exp)/.test(n));
 }
-// 11/19 test with the user's free key: gemini-flash-latest hung for 30 s+ and the newest full flash answered "high demand" (503),
-// while gemini-3.5-flash-lite answered in about 1 s. For live interpreting a fast "lite" model comes first; the rest are fallbacks.
+// 11/19 tests with the user's free key: gemini-flash-latest hung for 30 s+, the full 3.5–3.8 flash models were "busy" (503) or
+// gave no answer within 20 s, and gemini-3.5-flash-lite answered in 1–4 s. So: lite models first (reliable), stronger ones as fallbacks.
 function rankModels(list) {
   const ver = (n) => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || "0");
   const score = (n) => (/lite/.test(n) ? 1000 : 0) + ver(n) * 100 + (/latest/.test(n) ? 40 : 0) - (/(preview|exp)/.test(n) ? 300 : 0) - (/omni/.test(n) ? 500 : 0);
   return [...list].sort((a, b) => score(b) - score(a));
 }
+// the strongest stable full (non-lite) flash models, best first — tried before the lite ones when "정확하게" is chosen
+const strongModels = (list) => list.filter(n => !/(lite|preview|exp|omni)/.test(n))
+  .sort((a, b) => parseFloat((b.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || "0") - parseFloat((a.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || "0"));
+const restUntil = {};   // model → time it may be tried again after it was busy or slow (free models are often overloaded)
 function defaultModel(list) { return rankModels(list)[0] || "gemini-flash-lite-latest"; }
 function parseJSON(text) {
   const t = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
@@ -195,9 +209,9 @@ function parseJSON(text) {
   if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch {} }
   throw { code: "json", msg: "통역 결과를 읽지 못했어요. 다시 말해 주세요." };
 }
-// One request to one model, given up after 20 s (an overloaded model can hang far longer than that).
-async function callModel(model, system, parts) {
-  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 20000);
+// One request to one model, given up after `wait` ms (an overloaded model can hang far longer than that).
+async function callModel(model, system, parts, wait = 20000) {
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), wait);
   try {
     const r = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST", signal: ctl.signal, headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
@@ -212,18 +226,24 @@ async function callModel(model, system, parts) {
     throw { code: "net", msg: "인터넷 연결을 확인해 주세요." };
   } finally { clearTimeout(timer); }
 }
-// Tries the chosen model first, then the next best ones: a busy, slow, retired or over-quota model moves on to another
-// (each model has its own free quota). The model that answered becomes the one used next time.
+// Order of models for one request:
+//   a model picked in 설정 → (정확하게) the 2 strongest full models, each given only 8 s → the lite models, 20 s each.
+// A model that was busy or slow rests for 10 minutes, so a busy period costs the wait once, not on every sentence.
+let lastModel = "";
 async function gemini(system, parts) {
-  const order = [...new Set([settings.model, ...rankModels(models)].filter(Boolean))].slice(0, 5);
-  if (!order.length) order.push("gemini-flash-lite-latest");
+  const now = Date.now(), resting = (m) => restUntil[m] > now;
+  const strong = settings.prefer === "quality" ? strongModels(models).slice(0, 2).filter(m => !resting(m)) : [];
+  const light = rankModels(models).filter(m => /lite/.test(m));
+  let order = [...new Set([settings.model, ...strong, ...light, ...rankModels(models)].filter(Boolean))].slice(0, 6);
+  if (!order.length) order = ["gemini-flash-lite-latest"];
   let last = null, j = null;
   for (const m of order) {
-    try { j = await callModel(m, system, parts); if (settings.model !== m) { settings.model = m; saveSettings(); } break; }
+    try { j = await callModel(m, system, parts, strong.includes(m) && m !== settings.model ? 8000 : 20000); lastModel = m; break; }
     catch (e) {
       last = e;
       if (e.code === "key" || e.code === "net") throw e;   // another model would not help
       if (e.code === "model") { models = models.filter(x => x !== m); lsSet("thai.gemini.models", models); }
+      if (e.code === "busy" || e.code === "slow" || e.code === "quota") restUntil[m] = Date.now() + 10 * 60000;
     }
   }
   if (!j) {
@@ -234,9 +254,24 @@ async function gemini(system, parts) {
   if (!text) throw { code: "blocked", msg: "이 말은 통역 결과를 받지 못했어요." };
   return parseJSON(text);
 }
+const SCENES = { auto: "", restaurant: "a restaurant or food stall (ordering, spice level, allergies, the bill)", market: "a market or shop (prices, bargaining, sizes, colours)",
+  taxi: "a taxi or Grab ride (destination, route, meter, fare)", directions: "asking the way on the street (places, left/right, distance, landmarks)",
+  hotel: "a hotel (check-in, room problems, breakfast, check-out)", clinic: "a pharmacy or clinic (symptoms, medicine, how to take it)" };
 function systemPrompt() {
-  const me = settings.gender === "f" ? "female (use ค่ะ / คะ)" : "male (use ครับ)";
-  return `You are a live interpreter between Korean and Thai. The user is a Korean traveler (${me}) talking face to face with Thai people; both sides speak into the same phone.
+  const me = settings.gender === "f" ? "female (use ค่ะ in statements, คะ in questions)" : "male (use ครับ)";
+  const scene = SCENES[settings.scene] ? `\nThe conversation takes place at ${SCENES[settings.scene]}. Use the words people really use there.` : "";
+  const mine = dict.length ? `\nThe user corrected these translations before. When the same or a very similar sentence comes, use the corrected wording:\n` +
+    dict.slice(-30).map(d => `- ${d.lang === "ko" ? "Korean" : "Thai"} "${d.src}" → "${d.fixed}"`).join("\n") : "";
+  return `You are an expert live interpreter between Korean and Thai, like a friendly local guide. The user is a Korean traveler (${me}) talking face to face with Thai people; both sides speak into the same phone.${scene}
+Translate the MEANING and intention, the way a native speaker would say it in that situation — never word for word.
+Korean is often spoken without a subject; Thai is often short and casual. Fill in what is obviously meant, and keep the tone (polite request, question, complaint, joke).
+Examples of the quality expected:
+- Korean "저기요, 여기 계산이요" → Thai "เก็บเงินด้วย${settings.gender === "f" ? "ค่ะ" : "ครับ"}" (not a literal "here, calculation").
+- Korean "너무 맵지 않게 해 주세요" → Thai "ขอไม่เผ็ดมากนะ${settings.gender === "f" ? "คะ" : "ครับ"}"
+- Korean "좀 깎아 주실 수 있어요?" → Thai "ลดหน่อยได้ไหม${settings.gender === "f" ? "คะ" : "ครับ"}"
+- Thai "ไปไหนครับ" (taxi driver) → Korean "어디로 가세요?"
+- Thai "เผ็ดได้ไหมคะ" → Korean "매운 거 드실 수 있어요?"
+- Thai "หมดแล้วค่ะ" → Korean "다 떨어졌어요."${mine}
 For each input (an audio clip or a typed text):
 1. Decide the language: "ko" (Korean) or "th" (Thai). If the audio is silence, noise, unclear, or another language, return lang "none" and leave the other fields empty.
    The phone is in a room that may have a TV, radio, video or other people talking in the background. Interpret only a person speaking close to the phone, addressing the other person.
@@ -248,7 +283,8 @@ For each input (an audio clip or a typed text):
    Keep names, numbers, prices, times and places exact (write numbers as Arabic digits). No explanations inside the translation.
 4. For the Thai sentence (heard when lang is "th", translation when lang is "ko"):
    th_roman: easy romanization with tone marks (Paiboon style, e.g. "sà-wàt-dii khráp");
-   th_hangul: Hangul pronunciation guide a Korean can read aloud (keep aspiration distinct: ก=ㄲ, ค=ㅋ, ต=ㄸ, ท=ㅌ, ป=ㅃ, พ=ㅍ).
+   th_hangul: how a Korean should read the Thai sentence aloud, written ONLY in Hangul letters (never Thai script, never Latin letters),
+     e.g. "อันนี้เท่าไหร่ครับ" → "안니- 타오라이 크랍". Keep aspiration distinct: ก=ㄲ, ค=ㅋ, ต=ㄸ, ท=ㅌ, ป=ㅃ, พ=ㅍ; mark long vowels with "-".
 5. note: a very short Korean note only if something is ambiguous or culturally important (e.g. a price that sounds too high, a polite form to use); otherwise "".
 Answer with JSON only: {"lang":"ko|th|none","heard":"","translation":"","th_roman":"","th_hangul":"","note":""}`;
 }
@@ -414,7 +450,7 @@ async function runTranslate(parts, hint, typed) {
     pending.remove();
     const lang = r.lang === "th" || r.lang === "ko" ? r.lang : (typed ? hint : "none");
     if (lang === "none" || !String(r.translation || "").trim()) { setStatus("말소리를 알아듣지 못했어요. 다시 말해 주세요."); return; }
-    const item = { id: Date.now(), lang, heard: String(r.heard || typed || ""), translation: String(r.translation), th_roman: String(r.th_roman || ""), th_hangul: String(r.th_hangul || ""), note: String(r.note || "") };
+    const item = { id: Date.now(), lang, heard: String(r.heard || typed || ""), translation: String(r.translation), th_roman: String(r.th_roman || ""), th_hangul: /[฀-๿a-z]/i.test(r.th_hangul || "") ? "" : String(r.th_hangul || ""), note: String(r.note || "") };   // a "Hangul" reading that slipped into Thai or Latin letters is dropped
     log.push(item); saveLog(); $("list").append(card(item)); scrollDown();
     busy = false;
     await speak(item.translation, lang === "ko" ? "th" : "ko");
@@ -434,8 +470,8 @@ function card(x) {
   const thLine = toTh ? x.translation : x.heard;
   const read = settings.showReading && (x.th_hangul || x.th_roman)
     ? el("div", { class: "read" }, x.th_hangul ? el("b", { text: x.th_hangul }) : null, x.th_hangul && x.th_roman ? " · " : null, x.th_roman || null) : null;
-  return el("div", { class: "card " + (toTh ? "ko" : "th") },
-    el("div", { class: "dir" }, toTh ? "🇰🇷 한국어 → 🇹🇭 태국어" : "🇹🇭 ภาษาไทย → 🇰🇷 한국어"),
+  const node = el("div", { class: "card " + (toTh ? "ko" : "th") },
+    el("div", { class: "dir" }, toTh ? "🇰🇷 한국어 → 🇹🇭 태국어" : "🇹🇭 ภาษาไทย → 🇰🇷 한국어", x.fixed ? el("span", { class: "mine", text: "✓ 내 표현" }) : null),
     el("div", { class: "heard", lang: toTh ? "ko" : "th", text: x.heard }),
     !toTh && read ? read : null,
     el("div", { class: "out", lang: toTh ? "th" : "ko", text: x.translation }),
@@ -444,7 +480,29 @@ function card(x) {
     el("div", { class: "acts" },
       el("button", { class: "chip", type: "button", text: "▶ 다시 듣기", onclick: () => speak(x.translation, toTh ? "th" : "ko") }),
       el("button", { class: "chip", type: "button", text: "크게 보여주기", onclick: () => showBig(x) }),
-      toTh ? null : el("button", { class: "chip", type: "button", lang: "th", text: "▶ ไทย", title: "태국어 원문 듣기", onclick: () => speak(thLine, "th") })));
+      toTh ? null : el("button", { class: "chip", type: "button", lang: "th", text: "▶ ไทย", title: "태국어 원문 듣기", onclick: () => speak(thLine, "th") }),
+      el("button", { class: "chip", type: "button", text: "고치기", title: "통역을 바른 표현으로 고쳐서 '내 표현 사전'에 저장 · 다음부터 같은 말은 이렇게 통역해요", onclick: () => editCard(x, node) })));
+  return node;
+}
+// "고치기": the user types the right translation (e.g. what a Thai person said is correct); it replaces this card's
+// translation and goes into 내 표현 사전, which is sent with every request from now on.
+function editCard(x, node) {
+  const toTh = x.lang === "ko";
+  const box = el("textarea", { rows: "2", lang: toTh ? "th" : "ko", class: "fix" }); box.value = x.translation;
+  const save = () => {
+    const v = box.value.trim(); if (!v) return;
+    if (v !== x.translation) {
+      x.translation = v; x.fixed = true; if (toTh) { x.th_roman = ""; x.th_hangul = ""; }   // the old reading no longer matches
+      const i = log.findIndex(y => y.id === x.id); if (i >= 0) { log[i] = x; saveLog(); }
+      dict = dict.filter(d => d.src !== x.heard); dict.push({ src: x.heard, lang: x.lang, fixed: v }); saveDict();
+      toast("내 표현 사전에 저장했어요. 다음부터 이 말은 이렇게 통역해요");
+    }
+    node.replaceWith(card(x));
+  };
+  const form = el("div", { class: "fixbox" },
+    el("div", { class: "help", text: toTh ? "바른 태국어를 넣어 주세요 (태국 사람이 알려 준 말을 그대로 써도 돼요)" : "자연스러운 한국어로 고쳐 주세요" }), box,
+    el("div", { class: "acts" }, el("button", { class: "chip", type: "button", text: "저장", onclick: save }), el("button", { class: "chip", type: "button", text: "취소", onclick: () => node.replaceWith(card(x)) })));
+  node.querySelector(".acts").replaceWith(form); box.focus();
 }
 function renderList() {
   const L = $("list"); L.replaceChildren();
@@ -551,10 +609,17 @@ function renderSettings() {
     x.onchange = () => { settings[key] = conv(x.value); saveSettings(); if (key === "showReading") renderList(); };
     return x;
   })());
-  const modelOpts = (models.length ? models : [settings.model || "gemini-flash-latest"]).map(m => [m, m + (/lite/.test(m) ? " (가볍고 한도 넉넉)" : "")]);
+  const modelOpts = [["", "자동으로 고르기 (추천)"], ...models.map(m => [m, m + (/lite/.test(m) ? " (빠름 · 한도 넉넉)" : " (정확 · 자주 붐빔)")])];
+  const dictBox = el("div", { class: "dict" },
+    el("div", { class: "help", style: "border:0;padding:0", text: dict.length ? `내 표현 사전 (${dict.length}개) · 통역 카드의 '고치기'로 저장한 표현이에요. 다음부터 같은 말은 이렇게 통역해요.` : "내 표현 사전: 비어 있어요. 통역이 어색하면 카드의 '고치기'를 눌러 바른 표현을 저장하세요. 다음부터 같은 말은 그렇게 통역해요." }),
+    ...dict.slice().reverse().map(d => el("div", null, el("span", null, el("span", { lang: d.lang === "ko" ? "ko" : "th", text: d.src }), " → ", el("b", { lang: d.lang === "ko" ? "th" : "ko", text: d.fixed })),
+      el("button", { class: "chip", type: "button", text: "지우기", onclick: () => { dict = dict.filter(z => z !== d); saveDict(); renderSettings(); } }))));
   s.replaceChildren(
     el("h2", { text: "설정" }),
     el("div", null, el("div", { class: "help", text: "무료 AI 키" }), keyBox()),
+    sel("통역 우선", "prefer", [["quality", "정확하게 · 좋은 모델 먼저 (붐비면 몇 초 더 걸려요)"], ["speed", "빠르게 · 가벼운 모델만"]]),
+    sel("지금 있는 곳 (통역이 더 자연스러워져요)", "scene", [["auto", "정하지 않음"], ["restaurant", "식당 · 노점"], ["market", "시장 · 가게"], ["taxi", "택시 · 그랩"], ["directions", "길 묻기"], ["hotel", "호텔"], ["clinic", "약국 · 병원"]]),
+    dictBox,
     sel("AI 모델", "model", modelOpts),
     sel("내 성별 (태국어 끝말)", "gender", [["m", "남자 · ครับ (크랍)"], ["f", "여자 · ค่ะ (카)"]]),
     sel("마이크 민감도", "sens", [["near", "가까운 목소리만 (TV 켜진 곳 · 휴대폰에 대고 말하기)"], ["low", "낮게 (시끄러운 곳)"], ["mid", "보통"], ["high", "높게 (조용한 곳, 작은 목소리)"]]),
